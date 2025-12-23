@@ -1,5 +1,6 @@
 # Source data (may contain personal information)
-sources/
+sources/*
+!sources/README.md
 *.csv
 !books.csv
 
