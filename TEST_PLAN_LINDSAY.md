@@ -74,18 +74,29 @@ Row 1:
 ```
 
 ### ⚠️ Stop and Report If:
-- Any `read_status` value is not `read`, `reading`, `want_to_read`, or `None`
+- Any `read_status` value is not `read`, `reading`, `want_to_read`, or empty/None
 - `tags` contains commas (should be pipe-delimited)
 - `tags` contains uppercase (should be lowercased)
-- `genres` is populated (should be `None`)
-- `date_read` is populated (should be `None`)
-- `work_id` is populated (should be `None`)
+- `genres` is populated (should be empty/None)
+- `date_read` is populated (should be empty/None)
+- `work_id` is populated (should be empty/None)
+
+**Note:** CSV files store empty values as empty strings, which is equivalent to None for our purposes.
 
 ---
 
 ## Step 2: Smoke-Check Canonical Output
 
 ### Verification Commands
+
+**Note:** You can use the helper script `scripts/smoke_check_canonical.py` for a concise report, or use the Python one-liners below for manual inspection.
+
+**Helper script (optional):**
+```bash
+python scripts/smoke_check_canonical.py --dataset datasets/lindsay
+```
+
+**Manual checks (Python one-liners):**
 
 **1. Check header matches canonical schema:**
 ```bash
@@ -97,41 +108,42 @@ head -1 datasets/lindsay/sources/goodreads_canonical.csv
 work_id,isbn13,asin,title,author,publication_year,publisher,language,pages,genres,tags,description,formats,physical_owned,kindle_owned,audiobook_owned,goodreads_id,goodreads_url,sources,date_added,date_read,date_updated,read_status,rating,reread,reread_count,dnf,dnf_reason,pacing_rating,tone,vibe,what_i_wanted,did_it_deliver,favorite_elements,pet_peeves,notes,anchor_type,would_recommend
 ```
 
-**2. Check read_status values:**
+**B) Unique read_status values (CSV-safe):**
 ```bash
-cut -d',' -f23 datasets/lindsay/sources/goodreads_canonical.csv | sort | uniq -c
+python -c "import csv; from collections import Counter; p='datasets/lindsay/sources/goodreads_canonical.csv'; c=Counter(); f=open(p, newline='', encoding='utf-8'); r=csv.DictReader(f); [c.update([(row.get('read_status') or '').strip()]) for row in r]; print(c)"
 ```
 
 **Expected values:**
-- `read`, `reading`, `want_to_read`, or empty/None
+- `read`, `reading`, `want_to_read`, or empty string
 - **Should NOT see:** `currently-reading`, `to-read`, or other Goodreads values
 
-**3. Check genres is empty:**
+**C) Confirm genres is empty (reserved for external enrichment):**
 ```bash
-cut -d',' -f10 datasets/lindsay/sources/goodreads_canonical.csv | sort | uniq -c
+python -c "import csv; p='datasets/lindsay/sources/goodreads_canonical.csv'; f=open(p, newline='', encoding='utf-8'); r=csv.DictReader(f); vals=set((row.get('genres') or '').strip() for row in r); print(vals)"
 ```
 
 **Expected:**
-- All values should be empty/None (genres reserved for future enrichment)
+- Should be `{''}` or `set()` (all values empty/None)
+- Genres reserved for future enrichment
 
-**4. Check tags format:**
+**D) Confirm tags are pipe-delimited and lowercased (sample + bad examples):**
 ```bash
-cut -d',' -f11 datasets/lindsay/sources/goodreads_canonical.csv | grep -v "^$" | head -5
+python -c "import csv, itertools, re; p='datasets/lindsay/sources/goodreads_canonical.csv'; f=open(p, newline='', encoding='utf-8'); r=csv.DictReader(f); tags=[(row.get('tags') or '').strip() for row in itertools.islice(r, 200)]; bad=[t for t in tags if t and (',' in t or re.search(r'[A-Z]', t))]; sample=[t for t in tags if t][:10]; print('sample tags:', sample); print('bad tags examples:', bad[:10])"
 ```
 
 **Expected:**
-- Pipe-delimited format: `tag1|tag2|tag3`
-- All lowercase
-- No commas in tags field
-- Example: `favorites|historical-fiction|romance`
+- `sample tags:` shows pipe-delimited, lowercased examples
+- `bad tags examples:` should be empty (no commas, no uppercase)
+- Example: `['favorites|historical-fiction|romance', 'fantasy|urban-fantasy']`
 
-**5. Check date_read is empty:**
+**E) Confirm date_read is empty (we don't populate it):**
 ```bash
-cut -d',' -f21 datasets/lindsay/sources/goodreads_canonical.csv | sort | uniq -c
+python -c "import csv; from collections import Counter; p='datasets/lindsay/sources/goodreads_canonical.csv'; c=Counter(); f=open(p, newline='', encoding='utf-8'); r=csv.DictReader(f); [c.update([(row.get('date_read') or '').strip()]) for row in r]; print(list(c.items())[:10])"
 ```
 
 **Expected:**
-- All values should be empty/None (date_read not populated)
+- Mostly empty strings: `[('', N)]` where N is the count
+- `date_read` not populated by ingestion
 
 ---
 
@@ -352,7 +364,9 @@ python scripts/ingest_goodreads.py --dataset datasets/lindsay
 
 # 3. Smoke-check (manual inspection)
 head -1 datasets/lindsay/sources/goodreads_canonical.csv
-cut -d',' -f23 datasets/lindsay/sources/goodreads_canonical.csv | sort | uniq -c
+python -c "import csv; from collections import Counter; p='datasets/lindsay/sources/goodreads_canonical.csv'; c=Counter(); f=open(p, newline='', encoding='utf-8'); r=csv.DictReader(f); [c.update([(row.get('read_status') or '').strip()]) for row in r]; print(c)"
+python -c "import csv; p='datasets/lindsay/sources/goodreads_canonical.csv'; f=open(p, newline='', encoding='utf-8'); r=csv.DictReader(f); vals=set((row.get('genres') or '').strip() for row in r); print(vals)"
+python -c "import csv, itertools, re; p='datasets/lindsay/sources/goodreads_canonical.csv'; f=open(p, newline='', encoding='utf-8'); r=csv.DictReader(f); tags=[(row.get('tags') or '').strip() for row in itertools.islice(r, 200)]; bad=[t for t in tags if t and (',' in t or re.search(r'[A-Z]', t))]; sample=[t for t in tags if t][:10]; print('sample tags:', sample); print('bad tags examples:', bad[:10])"
 
 # 4. Merge and dedupe
 python scripts/merge_and_dedupe.py --dataset datasets/lindsay
