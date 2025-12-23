@@ -69,7 +69,7 @@
 
 ### Merge Strategy
 When merging records from multiple sources:
-1. If canonical_id matches → merge into single row
+1. If work_id matches → merge into single row
 2. Combine formats (union of all formats)
 3. Combine sources (union of all sources)
 4. **Never overwrite** manual preference fields if they exist
@@ -133,7 +133,7 @@ books-project/
 ### Key Functions
 - `normalize_title(title)` → normalized string
 - `normalize_author(author)` → "Last, First"
-- `compute_canonical_id(row)` → isbn13 or hash(title+author)
+- `generate_work_id(row)` → isbn13, asin, or hash(title+author)
 - `find_matches(new_row, existing_rows)` → list of potential matches
 - `safe_merge(existing, new)` → merged row (respects protected fields)
 
