@@ -5,7 +5,6 @@ Transforms Goodreads CSV export into canonical format.
 """
 
 import sys
-import csv
 from pathlib import Path
 from datetime import datetime
 
@@ -19,37 +18,59 @@ def map_goodreads_to_canonical(goodreads_row: dict) -> dict:
     """
     Map Goodreads export fields to canonical format.
     
-    Typical Goodreads fields:
-    - Book Id, Title, Author, Author l-f, Additional Authors, ISBN, ISBN13,
-      My Rating, Average Rating, Publisher, Binding, Number of Pages,
-      Year Published, Original Publication Year, Date Read, Date Added,
-      Bookshelves, My Review, Spoiler, Private Notes
+    Maps strictly according to specification:
+    - Exclusive Shelf ONLY for read_status (no inference from rating/Bookshelves)
+    - Read Count → reread_count (int, default 0)
+    - Owned Copies → physical_owned (1 if > 0, else 0)
+    - Bookshelves → genres (comma to pipe-delimited)
+    - All other fields per specification
     """
     canonical = {}
     
-    # Identifiers - clean ISBN/ISBN13
+    # work_id - leave blank, let merge_and_dedupe assign/preserve
+    canonical['work_id'] = None
+    
+    # Identifiers
+    # isbn13 <- ISBN13 (fallback to ISBN if ISBN13 missing)
     isbn13_raw = goodreads_row.get('ISBN13', '').strip() or goodreads_row.get('ISBN', '').strip()
     if isbn13_raw:
-        # Clean and normalize ISBN13
         canonical['isbn13'] = normalize_isbn13(isbn13_raw) or isbn13_raw.strip()
     else:
         canonical['isbn13'] = None
     
     canonical['asin'] = None  # Goodreads doesn't have ASIN
+    
+    # Basic info
     canonical['title'] = goodreads_row.get('Title', '').strip() or None
     canonical['author'] = goodreads_row.get('Author', '').strip() or None
     
     # Metadata
-    canonical['publication_year'] = goodreads_row.get('Year Published', '').strip() or None
+    # publication_year <- Year Published (fallback to Original Publication Year)
+    canonical['publication_year'] = (
+        goodreads_row.get('Year Published', '').strip() or 
+        goodreads_row.get('Original Publication Year', '').strip() or 
+        None
+    )
     canonical['publisher'] = goodreads_row.get('Publisher', '').strip() or None
+    canonical['language'] = None  # Goodreads doesn't have language
     canonical['pages'] = goodreads_row.get('Number of Pages', '').strip() or None
-    # Bookshelves as tags (don't infer read status from it)
-    canonical['genres'] = goodreads_row.get('Bookshelves', '').strip() or None
+    
+    # genres <- Bookshelves (treat as tags; convert comma-separated to pipe-delimited)
+    bookshelves = goodreads_row.get('Bookshelves', '').strip()
+    if bookshelves:
+        # Convert comma-separated to pipe-delimited
+        tags = [tag.strip() for tag in bookshelves.split(',') if tag.strip()]
+        canonical['genres'] = '|'.join(tags) if tags else None
+    else:
+        canonical['genres'] = None
+    
     canonical['description'] = None  # Goodreads export doesn't include description
     
-    # Formats and ownership
+    # Formats
     canonical['formats'] = None
-    # Ingest Owned Copies → physical_owned
+    
+    # Ownership
+    # physical_owned <- 1 if Owned Copies > 0 else 0
     owned_copies = goodreads_row.get('Owned Copies', '').strip()
     if owned_copies:
         try:
@@ -64,16 +85,20 @@ def map_goodreads_to_canonical(goodreads_row: dict) -> dict:
     canonical['audiobook_owned'] = '0'
     
     # Source provenance
+    # goodreads_id <- Book Id
     canonical['goodreads_id'] = goodreads_row.get('Book Id', '').strip() or None
-    canonical['goodreads_url'] = f"https://www.goodreads.com/book/show/{canonical['goodreads_id']}" if canonical['goodreads_id'] else None
+    # goodreads_url <- https://www.goodreads.com/book/show/{goodreads_id}
+    canonical['goodreads_url'] = (
+        f"https://www.goodreads.com/book/show/{canonical['goodreads_id']}" 
+        if canonical['goodreads_id'] else None
+    )
     canonical['sources'] = 'goodreads'
     
     # Dates
+    # date_added <- Date Added (normalize to YYYY-MM-DD)
     date_added = goodreads_row.get('Date Added', '').strip()
     if date_added:
-        # Goodreads format: "YYYY/MM/DD" or "YYYY-MM-DD"
         try:
-            # Try to parse and normalize
             if '/' in date_added:
                 dt = datetime.strptime(date_added, '%Y/%m/%d')
             else:
@@ -84,6 +109,7 @@ def map_goodreads_to_canonical(goodreads_row: dict) -> dict:
     else:
         canonical['date_added'] = None
     
+    # date_read <- Date Read (normalize)
     date_read = goodreads_row.get('Date Read', '').strip()
     if date_read:
         try:
@@ -97,9 +123,12 @@ def map_goodreads_to_canonical(goodreads_row: dict) -> dict:
     else:
         canonical['date_read'] = None
     
+    # date_updated <- today
     canonical['date_updated'] = datetime.now().strftime('%Y-%m-%d')
     
-    # Status - map strictly from Exclusive Shelf
+    # read_status - Use Exclusive Shelf as the ONLY source
+    # read -> read, currently-reading -> reading, to-read -> want_to_read
+    # Do NOT infer from rating or Bookshelves
     exclusive_shelf = goodreads_row.get('Exclusive Shelf', '').strip().lower()
     if exclusive_shelf == 'read':
         canonical['read_status'] = 'read'
@@ -110,21 +139,15 @@ def map_goodreads_to_canonical(goodreads_row: dict) -> dict:
     else:
         canonical['read_status'] = None
     
-    # Ratings
+    # rating <- My Rating (allow blank)
     rating = goodreads_row.get('My Rating', '').strip()
     if rating and rating.isdigit():
         canonical['rating'] = rating
     else:
         canonical['rating'] = None
     
-    # Manual fields (from Goodreads)
-    canonical['notes'] = goodreads_row.get('My Review', '').strip() or None
-    if canonical['notes']:
-        private_notes = goodreads_row.get('Private Notes', '').strip()
-        if private_notes:
-            canonical['notes'] = f"{canonical['notes']}\n\nPrivate Notes: {private_notes}"
-    
-    # Reread - ingest Read Count
+    # reread_count <- Read Count (int, default 0)
+    # reread <- 1 if reread_count > 1 else 0
     read_count = goodreads_row.get('Read Count', '').strip()
     if read_count:
         try:
@@ -132,13 +155,17 @@ def map_goodreads_to_canonical(goodreads_row: dict) -> dict:
             canonical['reread_count'] = str(count)
             canonical['reread'] = '1' if count > 1 else '0'
         except (ValueError, TypeError):
-            canonical['reread'] = None
-            canonical['reread_count'] = None
+            canonical['reread_count'] = '0'
+            canonical['reread'] = '0'
     else:
-        canonical['reread'] = None
-        canonical['reread_count'] = None
+        canonical['reread_count'] = '0'
+        canonical['reread'] = '0'
+    
+    # dnf fields
     canonical['dnf'] = None
     canonical['dnf_reason'] = None
+    
+    # Preference fields (leave empty)
     canonical['pacing_rating'] = None
     canonical['tone'] = None
     canonical['vibe'] = None
@@ -146,6 +173,20 @@ def map_goodreads_to_canonical(goodreads_row: dict) -> dict:
     canonical['did_it_deliver'] = None
     canonical['favorite_elements'] = None
     canonical['pet_peeves'] = None
+    
+    # notes <- My Review + Private Notes (append with labels)
+    my_review = goodreads_row.get('My Review', '').strip()
+    private_notes = goodreads_row.get('Private Notes', '').strip()
+    
+    if my_review and private_notes:
+        canonical['notes'] = f"My Review: {my_review}\n\nPrivate Notes: {private_notes}"
+    elif my_review:
+        canonical['notes'] = f"My Review: {my_review}"
+    elif private_notes:
+        canonical['notes'] = f"Private Notes: {private_notes}"
+    else:
+        canonical['notes'] = None
+    
     canonical['anchor_type'] = None
     canonical['would_recommend'] = None
     
@@ -170,24 +211,52 @@ def main():
     goodreads_rows = read_csv_safe(str(goodreads_file))
     print(f"  Found {len(goodreads_rows)} books")
     
+    if not goodreads_rows:
+        print("No books found in export.")
+        return
+    
     print(f"Converting to canonical format...")
     canonical_rows = [map_goodreads_to_canonical(row) for row in goodreads_rows]
     
-    # Define output fields (subset of canonical fields)
-    output_fields = [
-        'isbn13', 'asin', 'title', 'author', 'publication_year', 'publisher',
-        'pages', 'genres', 'physical_owned', 'goodreads_id', 'goodreads_url', 'sources',
-        'date_added', 'date_read', 'date_updated', 'read_status', 'rating',
-        'reread', 'reread_count', 'notes', 'would_recommend'
+    # Use full canonical schema
+    CANONICAL_FIELDS = [
+        'work_id', 'isbn13', 'asin', 'title', 'author', 'publication_year', 'publisher',
+        'language', 'pages', 'genres', 'description', 'formats', 'physical_owned',
+        'kindle_owned', 'audiobook_owned', 'goodreads_id', 'goodreads_url',
+        'sources', 'date_added', 'date_read', 'date_updated',
+        'read_status', 'rating', 'reread', 'reread_count', 'dnf', 'dnf_reason',
+        'pacing_rating', 'tone', 'vibe', 'what_i_wanted', 'did_it_deliver',
+        'favorite_elements', 'pet_peeves', 'notes', 'anchor_type', 'would_recommend'
     ]
     
+    # Ensure all rows have all fields
+    for row in canonical_rows:
+        for field in CANONICAL_FIELDS:
+            if field not in row:
+                row[field] = None
+    
     print(f"Writing canonical format to {output_file}...")
-    write_csv_safe(str(output_file), canonical_rows, output_fields)
+    write_csv_safe(str(output_file), canonical_rows, CANONICAL_FIELDS)
     print(f"  Wrote {len(canonical_rows)} books")
+    
+    # Preview first 3 rows (non-sensitive fields only)
+    print("\n" + "=" * 80)
+    print("Preview of first 3 mapped rows:")
+    print("=" * 80)
+    for idx, row in enumerate(canonical_rows[:3], 1):
+        print(f"\nRow {idx}:")
+        print(f"  Title: {row.get('title', 'N/A')}")
+        print(f"  Author: {row.get('author', 'N/A')}")
+        print(f"  ISBN13: {row.get('isbn13', 'N/A')}")
+        print(f"  Read Status: {row.get('read_status', 'N/A')}")
+        print(f"  Rating: {row.get('rating', 'N/A')}")
+        print(f"  Reread Count: {row.get('reread_count', 'N/A')}")
+        print(f"  Physical Owned: {row.get('physical_owned', 'N/A')}")
+        print(f"  Genres/Tags: {row.get('genres', 'N/A')}")
+        print(f"  Goodreads ID: {row.get('goodreads_id', 'N/A')}")
     
     print("\nDone! You can now run merge_and_dedupe.py to merge this into books.csv")
 
 
 if __name__ == '__main__':
     main()
-
