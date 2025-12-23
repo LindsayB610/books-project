@@ -244,6 +244,90 @@ At minimum:
 
 Ask the user or emit a report. Do not guess.
 
+## Commit Discipline (Required)
+
+This project evolves via small, intentional commits. Because `books.csv` is user-owned and manually edited, careless commits can permanently damage data or trust.
+
+### Commit Size & Scope
+
+- **One concern per commit**
+- Ingestion logic changes
+- Schema changes
+- Validation changes
+- Recommendation logic changes
+
+**Should never be mixed in a single commit.**
+
+- Avoid "cleanup + refactor + feature" commits
+
+### Schema Changes (High Friction, Intentional Only)
+
+Any change to the `books.csv` schema must include:
+- An update to `DESIGN.md`
+- A note in `CHANGES_SUMMARY.md` describing:
+  - What changed
+  - Why it changed
+  - Whether it is backward compatible
+
+**Rules:**
+- Do not remove or rename columns casually
+- Prefer adding columns over modifying existing ones
+- Never silently change semantics of a column
+
+### Data Safety Rules
+
+Commits must never:
+- Rewrite user notes
+- Reorder CSV columns unexpectedly
+- Change delimiters without documentation
+
+**Any change that affects merge behavior must be explicitly called out in the commit message.**
+
+### Commit Message Conventions
+
+Use clear, descriptive commit messages:
+
+**Good:**
+```
+Add validation for duplicate work_id and ISBN
+Fix Goodreads ingestion: read_status from Exclusive Shelf only
+Add bounded fuzzy matching with duplicate report output
+```
+
+**Bad:**
+```
+Refactor pipeline
+Fix stuff
+Cleanup
+```
+
+### Before Committing Ingestion or Merge Changes
+
+Run validation scripts and verify:
+- No protected fields were overwritten
+- Row counts are sane
+- No unexpected mass merges occurred
+
+**If behavior changed:**
+- Update `DESIGN.md`
+- Add a brief note to `CHANGES_SUMMARY.md`
+
+### Version Control Expectations
+
+- Treat `books.csv` like a data artifact, not generated junk:
+  - Changes should be reviewable
+  - Large diffs should be explainable
+- Raw source files in `sources/` should be committed only when:
+  - They are small test fixtures, OR
+  - You explicitly want a snapshot for debugging
+- Never commit personal data unintentionally
+
+### When Unsure
+
+- Stop
+- Ask the user
+- Or emit a report instead of mutating data
+
 ## Code Patterns
 
 ### Reading CSV Safely
