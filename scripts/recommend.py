@@ -1,0 +1,296 @@
+#!/usr/bin/env python3
+"""
+Simple recommendation stub using anchor_type books.
+Generates recommendations based on enriched anchor books.
+"""
+
+import sys
+from pathlib import Path
+from typing import List, Dict, Set
+import random
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from utils.csv_utils import read_csv_safe
+
+
+def load_anchor_books(books: List[Dict]) -> Dict[str, List[Dict]]:
+    """
+    Load books by anchor_type.
+    Returns dict mapping anchor_type to list of books.
+    """
+    anchors = {
+        'all_time_favorite': [],
+        'recent_hit': [],
+        'recent_miss': [],
+        'dnf': []
+    }
+    
+    for book in books:
+        anchor_type = book.get('anchor_type', '').strip()
+        if anchor_type in anchors:
+            anchors[anchor_type].append(book)
+    
+    return anchors
+
+
+def extract_preferences(anchor_books: List[Dict]) -> Dict:
+    """
+    Extract preference patterns from anchor books.
+    Returns dict with aggregated preferences.
+    """
+    preferences = {
+        'tones': set(),
+        'vibes': set(),
+        'favorite_elements': set(),
+        'pet_peeves': set(),
+        'genres': set(),
+        'ratings': [],
+        'what_worked': [],
+        'what_didnt_work': []
+    }
+    
+    for book in anchor_books:
+        # Collect tones and vibes
+        tone = book.get('tone', '').strip()
+        if tone:
+            preferences['tones'].add(tone.lower())
+        
+        vibe = book.get('vibe', '').strip()
+        if vibe:
+            preferences['vibes'].add(vibe.lower())
+        
+        # Collect favorite elements
+        elements = book.get('favorite_elements', '').strip()
+        if elements:
+            # Split by common delimiters
+            for elem in elements.replace(';', ',').split(','):
+                preferences['favorite_elements'].add(elem.strip().lower())
+        
+        # Collect pet peeves
+        peeves = book.get('pet_peeves', '').strip()
+        if peeves:
+            for peeve in peeves.replace(';', ',').split(','):
+                preferences['pet_peeves'].add(peeve.strip().lower())
+        
+        # Collect genres
+        genres = book.get('genres', '').strip()
+        if genres:
+            for genre in genres.split(','):
+                preferences['genres'].add(genre.strip().lower())
+        
+        # Collect ratings
+        rating = book.get('rating', '').strip()
+        if rating:
+            try:
+                preferences['ratings'].append(float(rating))
+            except (ValueError, TypeError):
+                pass
+        
+        # What worked (from favorite_elements or notes)
+        if elements:
+            preferences['what_worked'].append(elements)
+        
+        # What didn't work (from pet_peeves or dnf_reason)
+        if peeves:
+            preferences['what_didnt_work'].append(peeves)
+        dnf_reason = book.get('dnf_reason', '').strip()
+        if dnf_reason:
+            preferences['what_didnt_work'].append(dnf_reason)
+    
+    return preferences
+
+
+def find_candidate_books(books: List[Dict], preferences: Dict, exclude_anchors: Set[str]) -> List[Dict]:
+    """
+    Find candidate books for recommendations.
+    Excludes already-read books and anchor books.
+    """
+    candidates = []
+    
+    for book in books:
+        # Skip if already read
+        read_status = book.get('read_status', '').strip().lower()
+        if read_status in ['read', 'dnf']:
+            continue
+        
+        # Skip anchor books
+        title_author = f"{book.get('title', '')}|{book.get('author', '')}"
+        if title_author in exclude_anchors:
+            continue
+        
+        # Skip if no title/author
+        if not book.get('title') or not book.get('author'):
+            continue
+        
+        candidates.append(book)
+    
+    return candidates
+
+
+def score_book(book: Dict, preferences: Dict) -> float:
+    """
+    Score a book based on how well it matches preferences.
+    Returns a score from 0.0 to 1.0.
+    """
+    score = 0.0
+    factors = 0
+    
+    # Genre matching
+    book_genres = set()
+    genres_str = book.get('genres', '').strip()
+    if genres_str:
+        book_genres = {g.strip().lower() for g in genres_str.split(',')}
+    
+    if book_genres and preferences['genres']:
+        genre_overlap = len(book_genres & preferences['genres'])
+        if genre_overlap > 0:
+            score += min(0.3, genre_overlap / max(len(book_genres), len(preferences['genres'])))
+            factors += 1
+    
+    # Description matching (simple keyword matching)
+    description = (book.get('description') or '').lower()
+    if description:
+        # Check for favorite elements in description
+        for elem in preferences['favorite_elements']:
+            if elem in description:
+                score += 0.1
+                factors += 1
+                break  # Only count once
+        
+        # Check for tones/vibes in description
+        for tone in preferences['tones']:
+            if tone in description:
+                score += 0.05
+                factors += 1
+                break
+        
+        for vibe in preferences['vibes']:
+            if vibe in description:
+                score += 0.05
+                factors += 1
+                break
+    
+    # Normalize score
+    if factors > 0:
+        score = min(1.0, score)
+    else:
+        # Base score for unread books with minimal info
+        score = 0.1
+    
+    return score
+
+
+def generate_recommendations(books: List[Dict], num_recommendations: int = 12) -> List[Dict]:
+    """
+    Generate book recommendations based on anchor books.
+    """
+    # Load anchor books
+    anchors_by_type = load_anchor_books(books)
+    
+    # Focus on favorites and recent hits
+    positive_anchors = anchors_by_type['all_time_favorite'] + anchors_by_type['recent_hit']
+    
+    if not positive_anchors:
+        print("⚠️  No anchor books found (all_time_favorite or recent_hit).")
+        print("   Please enrich some books with anchor_type in books.csv")
+        return []
+    
+    print(f"📚 Found {len(positive_anchors)} positive anchor book(s)")
+    
+    # Extract preferences
+    preferences = extract_preferences(positive_anchors)
+    
+    print(f"   Preferences extracted:")
+    print(f"   - Tones: {', '.join(list(preferences['tones'])[:5])}")
+    print(f"   - Vibes: {', '.join(list(preferences['vibes'])[:5])}")
+    print(f"   - Genres: {', '.join(list(preferences['genres'])[:5])}")
+    if preferences['ratings']:
+        avg_rating = sum(preferences['ratings']) / len(preferences['ratings'])
+        print(f"   - Average rating of favorites: {avg_rating:.1f}")
+    
+    # Build exclude set
+    exclude_titles = {f"{b.get('title', '')}|{b.get('author', '')}" for b in positive_anchors}
+    
+    # Find candidates
+    candidates = find_candidate_books(books, preferences, exclude_titles)
+    
+    if not candidates:
+        print("⚠️  No candidate books found (all books are read or are anchor books)")
+        return []
+    
+    print(f"   Found {len(candidates)} candidate book(s)")
+    
+    # Score candidates
+    scored = [(book, score_book(book, preferences)) for book in candidates]
+    scored.sort(key=lambda x: x[1], reverse=True)
+    
+    # Select top recommendations
+    top_n = min(num_recommendations, len(scored))
+    recommendations = [book for book, score in scored[:top_n]]
+    
+    return recommendations
+
+
+def print_recommendations(recommendations: List[Dict]):
+    """Print formatted recommendations."""
+    if not recommendations:
+        return
+    
+    print("\n" + "=" * 80)
+    print(f"📖 Recommendations ({len(recommendations)} books)")
+    print("=" * 80)
+    print()
+    
+    for idx, book in enumerate(recommendations, 1):
+        title = book.get('title', 'Unknown')
+        author = book.get('author', 'Unknown')
+        genres = book.get('genres', 'N/A')
+        isbn13 = book.get('isbn13', 'N/A')
+        
+        print(f"{idx}. {title}")
+        print(f"   by {author}")
+        print(f"   Genres: {genres}")
+        if isbn13 and isbn13 != 'N/A':
+            print(f"   ISBN13: {isbn13}")
+        print()
+
+
+def main():
+    """Main entry point."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Generate book recommendations from anchor books')
+    parser.add_argument('-n', '--num', type=int, default=12, help='Number of recommendations (default: 12)')
+    parser.add_argument('--csv', type=str, help='Path to books.csv (default: books.csv in project root)')
+    
+    args = parser.parse_args()
+    
+    project_root = Path(__file__).parent.parent
+    books_csv = Path(args.csv) if args.csv else project_root / 'books.csv'
+    
+    if not books_csv.exists():
+        print(f"Error: {books_csv} not found.")
+        print("Please run merge_and_dedupe.py first to create books.csv")
+        return
+    
+    print(f"Loading {books_csv}...")
+    books = read_csv_safe(str(books_csv))
+    
+    if not books:
+        print("No books found in CSV.")
+        return
+    
+    print(f"Loaded {len(books)} books\n")
+    
+    recommendations = generate_recommendations(books, num_recommendations=args.num)
+    print_recommendations(recommendations)
+    
+    if recommendations:
+        print("\n💡 Tip: These are initial recommendations based on your anchor books.")
+        print("   The more anchor books you enrich, the better the recommendations!")
+
+
+if __name__ == '__main__':
+    main()
+

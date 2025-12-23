@@ -1,0 +1,15 @@
+# Books CSV Builder + Recommender
+# Python 3.7+
+
+# Core dependencies (minimal for now)
+# Add more as needed for OCR, advanced matching, etc.
+
+# For future: OCR/physical shelf processing
+# pillow>=9.0.0
+# pytesseract>=0.3.10
+# opencv-python>=4.5.0
+
+# For future: advanced fuzzy matching
+# fuzzywuzzy>=0.18.0
+# python-Levenshtein>=0.12.0
+
