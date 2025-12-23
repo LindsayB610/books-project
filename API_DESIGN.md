@@ -31,7 +31,7 @@ books-project/
 
 ### Technology Choice
 
-**Option A: Standard Library Only (Recommended for MVP)**
+**Option A: Standard Library Only**
 - Use `http.server` from stdlib
 - Pros: Zero dependencies, simple
 - Cons: More boilerplate, limited features
@@ -41,7 +41,15 @@ books-project/
 - Pros: Clean routing, easy to extend
 - Cons: Adds dependency
 
-**Recommendation**: Start with Flask (single dependency, ~50KB), can switch to stdlib later if needed.
+**Option C: FastAPI (Preferred for Implementation)**
+- Single dependency: `fastapi` (+ `uvicorn` for server)
+- Pros: Better typing support, automatic schema validation, OpenAPI docs
+- Cons: Slightly larger dependency footprint
+
+**Recommendation**: 
+- For documentation/planning: Flask is fine as the "single dependency" example
+- For actual implementation: Prefer FastAPI for better typing + schema validation
+- Can start with Flask and migrate to FastAPI if needed
 
 ## Proposed API Endpoints
 
@@ -140,35 +148,40 @@ POST /api/recommendations
 **Request Body:**
 ```json
 {
-  "query": "I'm looking for an urban fantasy series to get into",
-  "limit": 5
+  "query": "urban fantasy series",
+  "limit": 5,
+  "filters": {
+    "read_status": ["unread", "want_to_read"],
+    "genres": ["fantasy"]
+  }
 }
 ```
 
 **Response:**
 ```json
-{
-  "query": "I'm looking for an urban fantasy series to get into",
-  "recommendations": [
-    {
-      "work_id": "isbn13:9780451461032",
-      "title": "Storm Front",
-      "author": "Jim Butcher",
-      "score": 0.85,
-      "reasons": [
-        "Matches favorite genres: urban-fantasy|fantasy",
-        "Series starter book"
-      ]
-    }
-  ],
-  "limit": 5
-}
+[
+  {
+    "work_id": "isbn13:9780451461032",
+    "title": "Storm Front",
+    "author": "Jim Butcher",
+    "why": "Matches favorite tags: urban-fantasy|fantasy. Query keywords match: urban, fantasy",
+    "confidence": 0.85
+  },
+  {
+    "work_id": "isbn13:9780316127259",
+    "title": "Dead Until Dark",
+    "author": "Charlaine Harris",
+    "why": "Matches favorite tags: urban-fantasy|mystery. Series starter book",
+    "confidence": 0.78
+  }
+]
 ```
 
 **Implementation Note**: This endpoint would:
 1. Parse natural language query (extract keywords: "urban fantasy", "series")
-2. Use existing `recommend.py` logic with query parameters
-3. Return structured results with explanations
+2. Apply optional filters (read_status, genres, etc.)
+3. Use existing `recommend.py` logic with query parameters
+4. Return simple array of recommendations with work_id, title, author, why, and confidence
 
 ### 5. Get Filter Options (for UI dropdowns)
 
