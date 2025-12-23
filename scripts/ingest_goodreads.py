@@ -57,14 +57,17 @@ def map_goodreads_to_canonical(goodreads_row: dict) -> dict:
     canonical['language'] = None  # Goodreads doesn't have language
     canonical['pages'] = goodreads_row.get('Number of Pages', '').strip() or None
     
-    # genres <- Bookshelves (treat as tags; convert comma-separated to pipe-delimited, lowercased)
+    # genres = None (reserved for external genre enrichment)
+    canonical['genres'] = None
+    
+    # tags <- Bookshelves (user shelves/labels; convert comma-separated to pipe-delimited, lowercased)
     bookshelves = goodreads_row.get('Bookshelves', '').strip()
     if bookshelves:
         # Convert comma-separated to pipe-delimited, lowercase tags
         tags = [tag.strip().lower() for tag in bookshelves.split(',') if tag.strip()]
-        canonical['genres'] = '|'.join(tags) if tags else None
+        canonical['tags'] = '|'.join(tags) if tags else None
     else:
-        canonical['genres'] = None
+        canonical['tags'] = None
     
     canonical['description'] = None  # Goodreads export doesn't include description
     
@@ -263,7 +266,8 @@ def main():
         print(f"  Rating: {row.get('rating', 'N/A')}")
         print(f"  Reread Count: {row.get('reread_count', 'N/A')}")
         print(f"  Physical Owned: {row.get('physical_owned', 'N/A')}")
-        print(f"  Genres/Tags: {row.get('genres', 'N/A')}")
+        print(f"  Tags: {row.get('tags', 'N/A')}")
+        print(f"  Genres: {row.get('genres', 'N/A')}")
         print(f"  Goodreads ID: {row.get('goodreads_id', 'N/A')}")
     
     print("\nDone! You can now run merge_and_dedupe.py to merge this into books.csv")

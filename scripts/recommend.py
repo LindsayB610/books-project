@@ -50,7 +50,15 @@ def extract_preferences(positive_anchors: List[Dict], negative_anchors: List[Dic
     
     # Extract from positive anchors (all_time_favorite, recent_hit)
     for book in positive_anchors:
-        # Genres/tags
+        # Tags (preferred) and genres (fallback for future enrichment)
+        tags_str = book.get('tags', '').strip()
+        if tags_str:
+            for tag in tags_str.replace('|', ',').split(','):
+                tag_clean = tag.strip().lower()
+                if tag_clean:
+                    positive_genres.add(tag_clean)
+        
+        # Also check genres (for future enrichment)
         genres_str = book.get('genres', '').strip()
         if genres_str:
             for genre in genres_str.replace('|', ',').split(','):
@@ -70,7 +78,15 @@ def extract_preferences(positive_anchors: List[Dict], negative_anchors: List[Dic
     
     # Extract from negative anchors (recent_miss, dnf)
     for book in negative_anchors:
-        # Genres/tags
+        # Tags (preferred) and genres (fallback for future enrichment)
+        tags_str = book.get('tags', '').strip()
+        if tags_str:
+            for tag in tags_str.replace('|', ',').split(','):
+                tag_clean = tag.strip().lower()
+                if tag_clean:
+                    negative_genres.add(tag_clean)
+        
+        # Also check genres (for future enrichment)
         genres_str = book.get('genres', '').strip()
         if genres_str:
             for genre in genres_str.replace('|', ',').split(','):
@@ -173,8 +189,19 @@ def score_book(book: Dict, preferences: Dict, query: str = None) -> Tuple[float,
             score += 0.2
             reasons.append(f"Matches query: '{query}'")
     
-    # Extract book genres/tags (handle both comma and pipe delimiters)
+    # Extract book tags (preferred) and genres (fallback)
+    # Handle both comma and pipe delimiters
     book_genres = set()
+    
+    # Prefer tags (user shelves/labels)
+    tags_str = book.get('tags', '').strip()
+    if tags_str:
+        for tag in tags_str.replace('|', ',').split(','):
+            tag_clean = tag.strip().lower()
+            if tag_clean:
+                book_genres.add(tag_clean)
+    
+    # Also check genres (for future enrichment)
     genres_str = book.get('genres', '').strip()
     if genres_str:
         for genre in genres_str.replace('|', ',').split(','):
@@ -231,7 +258,7 @@ def score_book(book: Dict, preferences: Dict, query: str = None) -> Tuple[float,
             negative_penalty = overlap_ratio * 0.3  # Up to -0.3 points
             score -= negative_penalty
             overlap_list = list(negative_overlap)[:2]
-            reasons.append(f"Warning: matches disliked tags: {', '.join(overlap_list)}")
+            reasons.append(f"Warning: matches disliked tags/genres: {', '.join(overlap_list)}")
     
     # Negative tone/vibe/pet_peeves matching (simple substring match)
     negative_tones = preferences.get('negative_tones', set())
@@ -349,13 +376,16 @@ def print_recommendations(recommendations: List[Tuple[Dict, float, List[str]]]):
     for idx, (book, score, reasons) in enumerate(recommendations, 1):
         title = book.get('title', 'Unknown')
         author = book.get('author', 'Unknown')
+        tags = book.get('tags', 'N/A')
         genres = book.get('genres', 'N/A')
         isbn13 = book.get('isbn13', 'N/A')
         
         print(f"{idx}. {title}")
         print(f"   by {author}")
-        if genres and genres != 'N/A':
-            print(f"   Tags/Genres: {genres}")
+        if tags and tags != 'N/A':
+            print(f"   Tags: {tags}")
+        elif genres and genres != 'N/A':
+            print(f"   Genres: {genres}")
         if isbn13 and isbn13 != 'N/A':
             print(f"   ISBN13: {isbn13}")
         print(f"   Score: {score:.2f}")

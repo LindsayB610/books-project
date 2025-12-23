@@ -43,7 +43,8 @@ def map_kindle_to_canonical(kindle_row: dict) -> dict:
     
     canonical['publisher'] = kindle_row.get('Publisher', '').strip() or None
     canonical['pages'] = kindle_row.get('Pages', '').strip() or None
-    canonical['genres'] = None  # Kindle doesn't typically have genres
+    canonical['genres'] = None  # Reserved for external genre enrichment
+    canonical['tags'] = None  # Kindle doesn't have user shelves
     canonical['description'] = None
     
     # Formats

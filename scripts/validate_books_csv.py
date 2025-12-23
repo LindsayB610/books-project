@@ -204,7 +204,7 @@ def validate_enums(books: List[Dict], report: ValidationReport):
 
 def validate_delimiters(books: List[Dict], report: ValidationReport):
     """Check that pipe-delimited fields don't contain accidental commas."""
-    pipe_delimited_fields = ['genres', 'formats', 'sources']
+    pipe_delimited_fields = ['genres', 'tags', 'formats', 'sources']
     
     for book in books:
         for field in pipe_delimited_fields:

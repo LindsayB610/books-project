@@ -20,7 +20,7 @@ from utils.work_id import generate_work_id
 # Define the canonical schema
 CANONICAL_FIELDS = [
     'work_id', 'isbn13', 'asin', 'title', 'author', 'publication_year', 'publisher',
-    'language', 'pages', 'genres', 'description', 'formats', 'physical_owned',
+    'language', 'pages', 'genres', 'tags', 'description', 'formats', 'physical_owned',
     'kindle_owned', 'audiobook_owned', 'goodreads_id', 'goodreads_url',
     'sources', 'date_added', 'date_read', 'date_updated',
     'read_status', 'rating', 'reread', 'reread_count', 'dnf', 'dnf_reason',
