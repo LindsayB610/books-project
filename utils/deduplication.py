@@ -9,10 +9,10 @@ from .normalization import (
 )
 
 
-def find_matches(new_row: Dict, existing_rows: List[Dict]) -> List[Tuple[Dict, float]]:
+def find_matches(new_row: Dict, existing_rows: List[Dict]) -> List[Tuple[int, Dict, float]]:
     """
     Find potential matches for a new row in existing rows.
-    Returns list of (matched_row, confidence_score) tuples.
+    Returns list of (index, matched_row, confidence_score) tuples.
     Confidence: 1.0 = exact match, 0.5 = fuzzy match, 0.0 = no match
     
     Fuzzy matching is ONLY applied when ISBN13 and ASIN are both missing.
@@ -29,7 +29,7 @@ def find_matches(new_row: Dict, existing_rows: List[Dict]) -> List[Tuple[Dict, f
     # Check if we have identifiers - if so, don't use fuzzy matching
     has_identifiers = bool(new_isbn13 or new_asin)
     
-    for existing in existing_rows:
+    for idx, existing in enumerate(existing_rows):
         existing_canonical_id = compute_canonical_id(existing)
         existing_title = normalize_title(existing.get('title', ''))
         existing_author = normalize_author(existing.get('author', ''))
@@ -41,19 +41,19 @@ def find_matches(new_row: Dict, existing_rows: List[Dict]) -> List[Tuple[Dict, f
         # Exact canonical ID match (highest confidence)
         if new_canonical_id and new_canonical_id == existing_canonical_id:
             confidence = 1.0
-            matches.append((existing, confidence))
+            matches.append((idx, existing, confidence))
             continue
         
         # ISBN13 match
         if new_isbn13 and existing_isbn13 and new_isbn13 == existing_isbn13:
             confidence = 0.95
-            matches.append((existing, confidence))
+            matches.append((idx, existing, confidence))
             continue
         
         # ASIN match
         if new_asin and existing_asin and new_asin == existing_asin:
             confidence = 0.90
-            matches.append((existing, confidence))
+            matches.append((idx, existing, confidence))
             continue
         
         # Title + Author match (exact only if we have identifiers)
@@ -63,7 +63,7 @@ def find_matches(new_row: Dict, existing_rows: List[Dict]) -> List[Tuple[Dict, f
             
             if title_match and author_match:
                 confidence = 0.85
-                matches.append((existing, confidence))
+                matches.append((idx, existing, confidence))
                 continue
             
             # Partial match (title exact, author similar) - only if we have identifiers
@@ -73,7 +73,7 @@ def find_matches(new_row: Dict, existing_rows: List[Dict]) -> List[Tuple[Dict, f
                 existing_last = existing_author.split(',')[0].strip() if ',' in existing_author else ''
                 if new_last and existing_last and new_last == existing_last:
                     confidence = 0.70
-                    matches.append((existing, confidence))
+                    matches.append((idx, existing, confidence))
                     continue
         
         # Bounded fuzzy matching (ONLY when ISBN13 and ASIN are both missing)
@@ -88,11 +88,11 @@ def find_matches(new_row: Dict, existing_rows: List[Dict]) -> List[Tuple[Dict, f
                 combined_confidence = (title_similarity * 0.6 + author_similarity * 0.4)
                 if combined_confidence >= 0.92:
                     confidence = min(0.85, combined_confidence)  # Cap at 0.85 for fuzzy matches
-                    matches.append((existing, confidence))
+                    matches.append((idx, existing, confidence))
                     continue
     
     # Sort by confidence (highest first)
-    matches.sort(key=lambda x: x[1], reverse=True)
+    matches.sort(key=lambda x: x[2], reverse=True)
     return matches
 
 

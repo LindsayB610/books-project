@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """
 Main merge and deduplication script.
-Reads from all source files and merges into canonical books.csv.
+Reads from canonical source files and merges into books.csv.
 """
 
 import sys
 from pathlib import Path
 from typing import List, Dict, Tuple
+from datetime import datetime
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.csv_utils import read_csv_safe, write_csv_safe, safe_merge
 from utils.deduplication import find_matches
-from utils.normalization import compute_canonical_id
 from utils.work_id import generate_work_id
 
 
@@ -28,38 +28,35 @@ CANONICAL_FIELDS = [
     'favorite_elements', 'pet_peeves', 'notes', 'anchor_type', 'would_recommend'
 ]
 
+# Confidence thresholds
+AUTO_MERGE_THRESHOLD = 0.92  # High threshold - prefer false negatives
+POSSIBLE_DUPLICATE_THRESHOLD = 0.80  # Report possible duplicates above this
+
 
 def load_all_sources(sources_dir: Path) -> List[Dict]:
     """
-    Load books from all source files.
+    Load books from canonical source files (output of ingest scripts).
     Returns a list of book dictionaries.
     """
     all_books = []
     
-    # Goodreads export
-    goodreads_file = sources_dir / 'goodreads_export.csv'
+    # Goodreads canonical (output of ingest_goodreads.py)
+    goodreads_file = sources_dir / 'goodreads_canonical.csv'
     if goodreads_file.exists():
-        print(f"Loading Goodreads data from {goodreads_file}...")
+        print(f"Loading Goodreads canonical data from {goodreads_file}...")
         books = read_csv_safe(str(goodreads_file))
-        # TODO: Transform Goodreads format to canonical format
-        # For now, just add source marker
-        for book in books:
-            book['sources'] = 'goodreads'
         all_books.extend(books)
         print(f"  Loaded {len(books)} books from Goodreads")
     
-    # Kindle library
-    kindle_file = sources_dir / 'kindle_library.csv'
+    # Kindle canonical (output of ingest_kindle.py) - if present
+    kindle_file = sources_dir / 'kindle_canonical.csv'
     if kindle_file.exists():
-        print(f"Loading Kindle data from {kindle_file}...")
+        print(f"Loading Kindle canonical data from {kindle_file}...")
         books = read_csv_safe(str(kindle_file))
-        for book in books:
-            book['sources'] = 'kindle'
         all_books.extend(books)
         print(f"  Loaded {len(books)} books from Kindle")
     
-    # TODO: Physical shelf OCR
-    # physical_shelf_dir = sources_dir / 'physical_shelf_photos'
+    # TODO: Physical shelf OCR canonical - if present
     
     return all_books
 
@@ -68,15 +65,11 @@ def normalize_row(row: Dict) -> Dict:
     """
     Normalize a row to canonical format.
     Ensures all canonical fields exist.
-    Generates work_id if missing.
+    Does NOT generate work_id here - that happens only for new rows.
     """
     normalized = {}
     for field in CANONICAL_FIELDS:
         normalized[field] = row.get(field)
-    
-    # Generate work_id if missing
-    if not normalized.get('work_id'):
-        normalized['work_id'] = generate_work_id(normalized)
     
     # Merge kindle_asin into asin if present (for backward compatibility)
     if not normalized.get('asin') and row.get('kindle_asin'):
@@ -91,6 +84,40 @@ def normalize_row(row: Dict) -> Dict:
     return normalized
 
 
+def write_possible_duplicates_report(possible_duplicates: List[Tuple[Dict, Dict, float, str]], report_file: Path):
+    """
+    Write possible duplicates to a CSV report file.
+    """
+    if not possible_duplicates:
+        return
+    
+    # Create reports directory if needed
+    report_file.parent.mkdir(exist_ok=True)
+    
+    report_rows = []
+    for book1, book2, confidence, reason in possible_duplicates:
+        report_rows.append({
+            'work_id_1': book1.get('work_id', 'N/A'),
+            'title_1': book1.get('title', 'Unknown'),
+            'author_1': book1.get('author', 'Unknown'),
+            'isbn13_1': book1.get('isbn13', 'N/A'),
+            'work_id_2': book2.get('work_id', 'N/A'),
+            'title_2': book2.get('title', 'Unknown'),
+            'author_2': book2.get('author', 'Unknown'),
+            'isbn13_2': book2.get('isbn13', 'N/A'),
+            'confidence': f"{confidence:.3f}",
+            'reason': reason
+        })
+    
+    report_fields = [
+        'work_id_1', 'title_1', 'author_1', 'isbn13_1',
+        'work_id_2', 'title_2', 'author_2', 'isbn13_2',
+        'confidence', 'reason'
+    ]
+    
+    write_csv_safe(str(report_file), report_rows, report_fields)
+
+
 def merge_books(existing_books: List[Dict], new_books: List[Dict]) -> Tuple[List[Dict], List[Tuple[Dict, Dict, float, str]]]:
     """
     Merge new books into existing books, deduplicating as we go.
@@ -103,29 +130,46 @@ def merge_books(existing_books: List[Dict], new_books: List[Dict]) -> Tuple[List
     for new_book in new_books:
         normalized_new = normalize_row(new_book)
         
-        # Find matches
+        # Find matches (returns indices)
         matches = find_matches(normalized_new, merged)
         
         if matches:
-            # Merge with best match
-            best_match, confidence = matches[0]
-            if confidence >= 0.70:  # Threshold for auto-merge
-                idx = merged.index(best_match)
-                merged[idx] = safe_merge(best_match, normalized_new)
+            # Get best match
+            best_idx, best_match, confidence = matches[0]
+            
+            if confidence >= AUTO_MERGE_THRESHOLD:
+                # Auto-merge: preserve existing work_id, merge data
+                merged[best_idx] = safe_merge(best_match, normalized_new)
                 print(f"  Merged: {normalized_new.get('title', 'Unknown')} (confidence: {confidence:.2f})")
-            else:
-                # Low confidence - add as new but flag for review
-                # Also add to possible duplicates list
-                normalized_new['notes'] = (normalized_new.get('notes') or '') + f" [LOW_CONFIDENCE_MATCH: {matches[0][0].get('title')}]"
-                merged.append(normalized_new)
-                print(f"  Added (low confidence): {normalized_new.get('title', 'Unknown')}")
+            
+            elif confidence >= POSSIBLE_DUPLICATE_THRESHOLD:
+                # Possible duplicate: do NOT merge, add as new, record in report
+                # Generate work_id for the new row (it's truly new)
+                if not normalized_new.get('work_id'):
+                    normalized_new['work_id'] = generate_work_id(normalized_new)
                 
-                # Record as possible duplicate if confidence is still reasonably high
-                if confidence >= 0.75:
-                    reason = f"Fuzzy match during merge (confidence: {confidence:.2f})"
-                    possible_duplicates.append((best_match, normalized_new, confidence, reason))
+                merged.append(normalized_new)
+                print(f"  Added (possible duplicate): {normalized_new.get('title', 'Unknown')} (confidence: {confidence:.2f})")
+                
+                # Record in possible duplicates report
+                reason = f"Possible duplicate match (confidence: {confidence:.2f})"
+                possible_duplicates.append((best_match, normalized_new, confidence, reason))
+            
+            else:
+                # Low confidence: add as new, no duplicate record
+                # Generate work_id for the new row
+                if not normalized_new.get('work_id'):
+                    normalized_new['work_id'] = generate_work_id(normalized_new)
+                
+                merged.append(normalized_new)
+                print(f"  Added new: {normalized_new.get('title', 'Unknown')}")
+        
         else:
             # No match - add as new book
+            # Generate work_id for the new row
+            if not normalized_new.get('work_id'):
+                normalized_new['work_id'] = generate_work_id(normalized_new)
+            
             merged.append(normalized_new)
             print(f"  Added new: {normalized_new.get('title', 'Unknown')}")
     
@@ -139,6 +183,8 @@ def main():
     project_root = Path(__file__).parent.parent
     sources_dir = project_root / 'sources'
     books_csv = project_root / 'books.csv'
+    reports_dir = project_root / 'reports'
+    duplicates_report = reports_dir / 'possible_duplicates.csv'
     
     print("=" * 60)
     print("Books CSV Merge and Deduplication")
@@ -149,8 +195,8 @@ def main():
     existing_books = read_csv_safe(str(books_csv))
     print(f"  Found {len(existing_books)} existing books")
     
-    # Load all source data
-    print(f"\nLoading source data from {sources_dir}...")
+    # Load all canonical source data
+    print(f"\nLoading canonical source data from {sources_dir}...")
     if not sources_dir.exists():
         print(f"  Creating sources directory...")
         sources_dir.mkdir()
@@ -158,7 +204,8 @@ def main():
     new_books = load_all_sources(sources_dir)
     
     if not new_books:
-        print("\nNo source data found. Please add data to the sources/ directory.")
+        print("\nNo canonical source data found.")
+        print("Please run ingest scripts first (e.g., ingest_goodreads.py)")
         print("See README.md for instructions.")
         return
     
@@ -166,16 +213,17 @@ def main():
     print(f"\nMerging and deduplicating...")
     merged_books, possible_duplicates = merge_books(existing_books, new_books)
     
-    # Report possible duplicates
+    # Write possible duplicates report
     if possible_duplicates:
-        print(f"\n⚠️  Found {len(possible_duplicates)} possible duplicate(s) (confidence >= 0.75):")
-        for book1, book2, confidence, reason in possible_duplicates:
-            print(f"  • {book1.get('title', 'Unknown')} <-> {book2.get('title', 'Unknown')} ({confidence:.2%})")
-        print(f"  Run 'python scripts/find_duplicates.py' for a detailed report.")
+        print(f"\n⚠️  Found {len(possible_duplicates)} possible duplicate(s) (confidence >= {POSSIBLE_DUPLICATE_THRESHOLD:.2f})")
+        write_possible_duplicates_report(possible_duplicates, duplicates_report)
+        print(f"  Wrote report to {duplicates_report}")
+        print(f"  Review manually and merge if appropriate")
     
-    # Ensure all rows have all fields and work_ids
+    # Ensure all rows have all fields
+    # Preserve existing work_ids, only generate for rows that don't have one
     for book in merged_books:
-        # Generate work_id if missing
+        # Only generate work_id if missing (shouldn't happen after merge, but safety check)
         if not book.get('work_id'):
             book['work_id'] = generate_work_id(book)
         
@@ -196,9 +244,8 @@ def main():
     print(f"Your manual fields will be preserved on the next run.")
     
     if possible_duplicates:
-        print(f"\n💡 Tip: Review possible duplicates with: python scripts/find_duplicates.py")
+        print(f"\n💡 Tip: Review possible duplicates in {duplicates_report}")
 
 
 if __name__ == '__main__':
     main()
-
