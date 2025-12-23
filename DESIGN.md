@@ -14,11 +14,11 @@
 - `publisher` - Publisher name
 - `language` - Language code (e.g., "en", "fr")
 - `pages` - Page count
-- `genres` - Comma-separated genres/tags
+- `genres` - Pipe-delimited genres/tags: "fantasy|fiction|mystery" (use `|` for multi-valued fields)
 - `description` - Book description/summary
 
 ### Formats & Ownership
-- `formats` - Comma-separated: "kindle,physical,audiobook"
+- `formats` - Pipe-delimited: "kindle|physical|audiobook" (use `|` for multi-valued fields)
 - `physical_owned` - 0/1 flag
 - `kindle_owned` - 0/1 flag
 - `audiobook_owned` - 0/1 flag
@@ -26,7 +26,7 @@
 ### Source Provenance (for debugging/tracking)
 - `goodreads_id` - Goodreads book ID
 - `goodreads_url` - Goodreads URL
-- `sources` - Comma-separated list: "goodreads,kindle,physical_shelf"
+- `sources` - Pipe-delimited list: "goodreads|kindle|physical_shelf" (use `|` for multi-valued fields)
 
 ### Dates
 - `date_added` - When first added to system (YYYY-MM-DD)
