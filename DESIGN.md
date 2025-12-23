@@ -7,14 +7,14 @@
 - `asin` - Amazon/Kindle identifier (secondary)
 - `title` - Normalized title (for fallback matching)
 - `author` - Normalized author name (last, first)
-- `canonical_id` - Computed stable ID (isbn13 or hash of title+author)
+- `work_id` - Stable internal identifier (isbn13, asin, or hash-based) - **This is the primary stable identifier**
 
 ### Metadata (auto-populated from sources)
 - `publication_year` - Year published
 - `publisher` - Publisher name
 - `language` - Language code (e.g., "en", "fr")
 - `pages` - Page count
-- `genres` - Pipe-delimited genres/tags: "fantasy|fiction|mystery" (use `|` for multi-valued fields)
+- `genres` - Pipe-delimited tags/genres: "fantasy|fiction|mystery" (use `|` for multi-valued fields, tags are lowercased)
 - `description` - Book description/summary
 
 ### Formats & Ownership
@@ -30,7 +30,7 @@
 
 ### Dates
 - `date_added` - When first added to system (YYYY-MM-DD)
-- `date_read` - Date finished reading (YYYY-MM-DD or YYYY-MM)
+- `date_read` - Date finished reading (YYYY-MM-DD or YYYY-MM) - **Optional/deprecated: not populated by default**
 - `date_updated` - Last update timestamp (YYYY-MM-DD)
 
 ### Status

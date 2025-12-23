@@ -202,6 +202,22 @@ def validate_enums(books: List[Dict], report: ValidationReport):
                 report.add_warning(f"Invalid {field} value: {value} (expected: 0, 1, or empty)", book)
 
 
+def validate_delimiters(books: List[Dict], report: ValidationReport):
+    """Check that pipe-delimited fields don't contain accidental commas."""
+    pipe_delimited_fields = ['genres', 'formats', 'sources']
+    
+    for book in books:
+        for field in pipe_delimited_fields:
+            value = book.get(field, '').strip()
+            if value:
+                # Check if it contains commas (which suggests wrong delimiter)
+                if ',' in value and '|' not in value:
+                    report.add_warning(f"Field {field} contains commas but no pipes - should be pipe-delimited", book)
+                # Check for mixed delimiters
+                if ',' in value and '|' in value:
+                    report.add_warning(f"Field {field} contains both commas and pipes - inconsistent delimiter", book)
+
+
 def validate_all(books: List[Dict]) -> ValidationReport:
     """Run all validation checks."""
     report = ValidationReport()
@@ -218,6 +234,7 @@ def validate_all(books: List[Dict]) -> ValidationReport:
     validate_ratings(books, report)
     validate_reread_count(books, report)
     validate_enums(books, report)
+    validate_delimiters(books, report)
     
     return report
 

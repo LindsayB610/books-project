@@ -37,33 +37,74 @@ def load_anchor_books(books: List[Dict]) -> Dict[str, List[Dict]]:
 def extract_preferences(positive_anchors: List[Dict], negative_anchors: List[Dict]) -> Dict:
     """
     Extract preference patterns from anchor books.
-    Returns dict with positive genres (from favorites/hits) and negative genres (from misses/dnf).
+    Returns dict with positive genres/tags, tones, vibes (from favorites/hits) 
+    and negative genres, tones, vibes, pet_peeves (from misses/dnf).
     """
     positive_genres = set()
+    positive_tones = set()
+    positive_vibes = set()
     negative_genres = set()
+    negative_tones = set()
+    negative_vibes = set()
+    negative_pet_peeves = set()
     
-    # Extract genres from positive anchors (all_time_favorite, recent_hit)
+    # Extract from positive anchors (all_time_favorite, recent_hit)
     for book in positive_anchors:
+        # Genres/tags
         genres_str = book.get('genres', '').strip()
         if genres_str:
-            # Handle both comma and pipe delimiters
             for genre in genres_str.replace('|', ',').split(','):
                 genre_clean = genre.strip().lower()
                 if genre_clean:
                     positive_genres.add(genre_clean)
+        
+        # Tones
+        tone = book.get('tone', '').strip()
+        if tone:
+            positive_tones.add(tone.lower())
+        
+        # Vibes
+        vibe = book.get('vibe', '').strip()
+        if vibe:
+            positive_vibes.add(vibe.lower())
     
-    # Extract genres from negative anchors (recent_miss, dnf)
+    # Extract from negative anchors (recent_miss, dnf)
     for book in negative_anchors:
+        # Genres/tags
         genres_str = book.get('genres', '').strip()
         if genres_str:
             for genre in genres_str.replace('|', ',').split(','):
                 genre_clean = genre.strip().lower()
                 if genre_clean:
                     negative_genres.add(genre_clean)
+        
+        # Tones
+        tone = book.get('tone', '').strip()
+        if tone:
+            negative_tones.add(tone.lower())
+        
+        # Vibes
+        vibe = book.get('vibe', '').strip()
+        if vibe:
+            negative_vibes.add(vibe.lower())
+        
+        # Pet peeves
+        pet_peeves = book.get('pet_peeves', '').strip()
+        if pet_peeves:
+            # Split by common delimiters
+            for peeve in pet_peeves.replace(';', ',').split(','):
+                peeve_clean = peeve.strip().lower()
+                if peeve_clean:
+                    negative_pet_peeves.add(peeve_clean)
     
     return {
         'positive_genres': positive_genres,
-        'negative_genres': negative_genres
+        'positive_tones': positive_tones,
+        'positive_vibes': positive_vibes,
+        'negative_genres': negative_genres,
+        'negative_tones': negative_tones,
+        'negative_vibes': negative_vibes,
+        'negative_pet_peeves': negative_pet_peeves
     }
 
 
@@ -105,20 +146,31 @@ def find_candidate_books(books: List[Dict], preferences: Dict, exclude_anchors: 
 
 def score_book(book: Dict, preferences: Dict, query: str = None) -> Tuple[float, List[str]]:
     """
-    Score a book based on tag/genre overlap with anchor_type preferences.
-    Scoring: positive_genres (from all_time_favorite, recent_hit) minus negative_genres (from recent_miss, dnf)
+    Score a book based on tag/genre overlap + tone/vibe matching with anchor_type preferences.
+    Scoring: positive anchors (genres/tags/tones/vibes) minus negative anchors (genres/tones/vibes/pet_peeves)
+    Query keywords boost matching tags/genres.
     Returns (score, reasons) tuple where score is 0.0 to 1.0 and reasons is a list of strings.
     """
     score = 0.0
     reasons = []
     
-    # Query matching (if provided) - boosts score but doesn't guarantee inclusion
+    # Extract query keywords (simple word extraction)
+    query_keywords = set()
+    if query:
+        query_lower = query.lower()
+        # Extract words from query
+        for word in query_lower.split():
+            # Remove common stop words
+            if word not in ['i', 'am', 'looking', 'for', 'an', 'a', 'the', 'to', 'get', 'into', 'want', 'something', 'but', 'not']:
+                query_keywords.add(word)
+    
+    # Query matching in title/author (if provided)
     if query:
         query_lower = query.lower()
         title = (book.get('title', '') or '').lower()
         author = (book.get('author', '') or '').lower()
         if query_lower in title or query_lower in author:
-            score += 0.3
+            score += 0.2
             reasons.append(f"Matches query: '{query}'")
     
     # Extract book genres/tags (handle both comma and pipe delimiters)
@@ -130,35 +182,81 @@ def score_book(book: Dict, preferences: Dict, query: str = None) -> Tuple[float,
             if genre_clean:
                 book_genres.add(genre_clean)
     
-    if not book_genres:
-        # No genres to match - minimal score
-        if score == 0.0:
-            score = 0.01
-        return (score, reasons)
+    # Extract book tone and vibe
+    book_tone = (book.get('tone', '') or '').strip().lower()
+    book_vibe = (book.get('vibe', '') or '').strip().lower()
     
-    # Positive genre overlap (from all_time_favorite, recent_hit)
+    # Query keyword boost: if query keywords match genres/tags, boost score
+    if query_keywords and book_genres:
+        keyword_matches = query_keywords & book_genres
+        if keyword_matches:
+            score += 0.3
+            reasons.append(f"Query keywords match: {', '.join(list(keyword_matches)[:2])}")
+    
+    # Positive genre/tag overlap (from all_time_favorite, recent_hit)
     positive_genres = preferences.get('positive_genres', set())
-    if positive_genres:
+    if positive_genres and book_genres:
         positive_overlap = book_genres & positive_genres
         if positive_overlap:
-            # Score based on overlap ratio
             overlap_ratio = len(positive_overlap) / max(len(book_genres), len(positive_genres))
-            positive_score = overlap_ratio * 0.7  # Up to 0.7 points
+            positive_score = overlap_ratio * 0.5  # Up to 0.5 points
             score += positive_score
             overlap_list = list(positive_overlap)[:3]
-            reasons.append(f"Matches favorite genres: {', '.join(overlap_list)}")
+            reasons.append(f"Matches favorite tags: {', '.join(overlap_list)}")
     
-    # Negative genre overlap (from recent_miss, dnf) - subtracts from score
+    # Positive tone/vibe matching (simple substring match)
+    positive_tones = preferences.get('positive_tones', set())
+    positive_vibes = preferences.get('positive_vibes', set())
+    
+    if book_tone:
+        for tone in positive_tones:
+            if tone in book_tone or book_tone in tone:
+                score += 0.15
+                reasons.append(f"Matches favorite tone: {tone}")
+                break  # Only count once
+    
+    if book_vibe:
+        for vibe in positive_vibes:
+            if vibe in book_vibe or book_vibe in vibe:
+                score += 0.15
+                reasons.append(f"Matches favorite vibe: {vibe}")
+                break  # Only count once
+    
+    # Negative genre/tag overlap (from recent_miss, dnf) - subtracts from score
     negative_genres = preferences.get('negative_genres', set())
-    if negative_genres:
+    if negative_genres and book_genres:
         negative_overlap = book_genres & negative_genres
         if negative_overlap:
-            # Penalize for matching genres you didn't like
             overlap_ratio = len(negative_overlap) / max(len(book_genres), len(negative_genres))
-            negative_penalty = overlap_ratio * 0.4  # Up to -0.4 points
+            negative_penalty = overlap_ratio * 0.3  # Up to -0.3 points
             score -= negative_penalty
             overlap_list = list(negative_overlap)[:2]
-            reasons.append(f"Warning: also matches disliked genres: {', '.join(overlap_list)}")
+            reasons.append(f"Warning: matches disliked tags: {', '.join(overlap_list)}")
+    
+    # Negative tone/vibe/pet_peeves matching (simple substring match)
+    negative_tones = preferences.get('negative_tones', set())
+    negative_vibes = preferences.get('negative_vibes', set())
+    negative_pet_peeves = preferences.get('negative_pet_peeves', set())
+    
+    # Check book fields against negative preferences
+    book_text = f"{book_tone} {book_vibe}".lower()
+    for tone in negative_tones:
+        if tone in book_text:
+            score -= 0.2
+            reasons.append(f"Warning: matches disliked tone: {tone}")
+            break
+    
+    for vibe in negative_vibes:
+        if vibe in book_text:
+            score -= 0.2
+            reasons.append(f"Warning: matches disliked vibe: {vibe}")
+            break
+    
+    for peeve in negative_pet_peeves:
+        if peeve in book_text:
+            score -= 0.15
+            reasons.append(f"Warning: matches pet peeve: {peeve}")
+            break
     
     # Ensure score is non-negative
     score = max(0.0, score)
@@ -166,7 +264,7 @@ def score_book(book: Dict, preferences: Dict, query: str = None) -> Tuple[float,
     # If no matches at all, give minimal score
     if score == 0.0:
         score = 0.01
-        reasons.append("No genre overlap with preferences")
+        reasons.append("No overlap with preferences")
     
     return (min(1.0, score), reasons)
 

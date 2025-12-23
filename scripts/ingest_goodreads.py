@@ -32,9 +32,11 @@ def map_goodreads_to_canonical(goodreads_row: dict) -> dict:
     
     # Identifiers
     # isbn13 <- ISBN13 (fallback to ISBN if ISBN13 missing)
+    # Normalize using normalize_isbn13; if normalization fails, set to None (do NOT keep dirty raw values)
     isbn13_raw = goodreads_row.get('ISBN13', '').strip() or goodreads_row.get('ISBN', '').strip()
     if isbn13_raw:
-        canonical['isbn13'] = normalize_isbn13(isbn13_raw) or isbn13_raw.strip()
+        normalized = normalize_isbn13(isbn13_raw)
+        canonical['isbn13'] = normalized if normalized else None  # Only use if normalization succeeds
     else:
         canonical['isbn13'] = None
     
@@ -55,11 +57,11 @@ def map_goodreads_to_canonical(goodreads_row: dict) -> dict:
     canonical['language'] = None  # Goodreads doesn't have language
     canonical['pages'] = goodreads_row.get('Number of Pages', '').strip() or None
     
-    # genres <- Bookshelves (treat as tags; convert comma-separated to pipe-delimited)
+    # genres <- Bookshelves (treat as tags; convert comma-separated to pipe-delimited, lowercased)
     bookshelves = goodreads_row.get('Bookshelves', '').strip()
     if bookshelves:
-        # Convert comma-separated to pipe-delimited
-        tags = [tag.strip() for tag in bookshelves.split(',') if tag.strip()]
+        # Convert comma-separated to pipe-delimited, lowercase tags
+        tags = [tag.strip().lower() for tag in bookshelves.split(',') if tag.strip()]
         canonical['genres'] = '|'.join(tags) if tags else None
     else:
         canonical['genres'] = None
@@ -70,14 +72,14 @@ def map_goodreads_to_canonical(goodreads_row: dict) -> dict:
     canonical['formats'] = None
     
     # Ownership
-    # physical_owned <- 1 if Owned Copies > 0 else 0
+    # physical_owned <- 1 if Owned Copies > 0 else 0 (if parse fails, set to None)
     owned_copies = goodreads_row.get('Owned Copies', '').strip()
     if owned_copies:
         try:
             owned_count = int(owned_copies)
             canonical['physical_owned'] = '1' if owned_count > 0 else '0'
         except (ValueError, TypeError):
-            canonical['physical_owned'] = '0'
+            canonical['physical_owned'] = None  # Set to None if parse fails
     else:
         canonical['physical_owned'] = '0'
     
@@ -96,32 +98,41 @@ def map_goodreads_to_canonical(goodreads_row: dict) -> dict:
     
     # Dates
     # date_added <- Date Added (normalize to YYYY-MM-DD)
+    # Accept %Y/%m/%d, %Y-%m-%d, and if encountered %Y/%m or %Y-%m leave as-is
     date_added = goodreads_row.get('Date Added', '').strip()
     if date_added:
         try:
             if '/' in date_added:
-                dt = datetime.strptime(date_added, '%Y/%m/%d')
+                # Try full date first
+                try:
+                    dt = datetime.strptime(date_added, '%Y/%m/%d')
+                    canonical['date_added'] = dt.strftime('%Y-%m-%d')
+                except ValueError:
+                    # Try year/month only
+                    try:
+                        dt = datetime.strptime(date_added, '%Y/%m')
+                        canonical['date_added'] = dt.strftime('%Y-%m')
+                    except ValueError:
+                        canonical['date_added'] = date_added
             else:
-                dt = datetime.strptime(date_added, '%Y-%m-%d')
-            canonical['date_added'] = dt.strftime('%Y-%m-%d')
+                # Try full date first
+                try:
+                    dt = datetime.strptime(date_added, '%Y-%m-%d')
+                    canonical['date_added'] = dt.strftime('%Y-%m-%d')
+                except ValueError:
+                    # Try year/month only
+                    try:
+                        dt = datetime.strptime(date_added, '%Y-%m')
+                        canonical['date_added'] = dt.strftime('%Y-%m')
+                    except ValueError:
+                        canonical['date_added'] = date_added
         except:
             canonical['date_added'] = date_added
     else:
         canonical['date_added'] = None
     
-    # date_read <- Date Read (normalize)
-    date_read = goodreads_row.get('Date Read', '').strip()
-    if date_read:
-        try:
-            if '/' in date_read:
-                dt = datetime.strptime(date_read, '%Y/%m/%d')
-            else:
-                dt = datetime.strptime(date_read, '%Y-%m-%d')
-            canonical['date_read'] = dt.strftime('%Y-%m-%d')
-        except:
-            canonical['date_read'] = date_read
-    else:
-        canonical['date_read'] = None
+    # date_read - Do not populate from Goodreads anymore. Leave it None.
+    canonical['date_read'] = None
     
     # date_updated <- today
     canonical['date_updated'] = datetime.now().strftime('%Y-%m-%d')
