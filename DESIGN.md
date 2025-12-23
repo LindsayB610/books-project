@@ -1,5 +1,78 @@
 # Books CSV Builder + Recommender - Design Document
 
+## Dataset-Per-User Architecture
+
+This system supports multiple user datasets, each self-contained in its own directory. This allows:
+- Multiple users to maintain separate reading histories
+- Testing changes on isolated datasets
+- Organizing multiple book collections
+
+### Dataset Structure
+
+Each dataset is a directory containing:
+- `sources/` - Input data (Goodreads exports, Kindle data, etc.)
+- `books.csv` - Canonical output (the single source of truth)
+- `reports/` - Validation and duplicate reports
+
+Example layout:
+```
+datasets/
+├── default/          # Default dataset (used if --dataset not specified)
+│   ├── sources/
+│   │   ├── goodreads_export.csv
+│   │   └── goodreads_canonical.csv
+│   ├── books.csv
+│   └── reports/
+│       └── possible_duplicates.csv
+├── lindsay/          # User-specific dataset
+│   ├── sources/
+│   ├── books.csv
+│   └── reports/
+└── user_123/         # Another user dataset
+    ├── sources/
+    ├── books.csv
+    └── reports/
+```
+
+### Script Usage
+
+All CLI scripts accept a `--dataset` argument (default: `datasets/default`):
+
+```bash
+# Ingest Goodreads data
+python scripts/ingest_goodreads.py --dataset datasets/default
+
+# Merge and deduplicate
+python scripts/merge_and_dedupe.py --dataset datasets/default
+
+# Validate
+python scripts/validate_books_csv.py --dataset datasets/default
+
+# Find duplicates
+python scripts/find_duplicates.py --dataset datasets/default
+
+# Generate recommendations
+python scripts/recommend.py --dataset datasets/default --query "fantasy" --limit 5
+```
+
+### Path Resolution
+
+- Scripts resolve paths relative to the dataset root
+- `sources/` is always `{dataset_root}/sources/`
+- `books.csv` is always `{dataset_root}/books.csv`
+- `reports/` is always `{dataset_root}/reports/`
+- No global `sources/` or `books.csv` assumptions
+
+### Data Isolation
+
+Each dataset is completely isolated:
+- Separate `books.csv` files
+- Separate source data
+- Separate reports
+- No cross-dataset contamination
+
+This ensures deterministic, reproducible behavior and preserves protected/manual fields per dataset.
+
 ## CSV Schema (`books.csv`)
 
 ### Core Identifiers (for deduplication)

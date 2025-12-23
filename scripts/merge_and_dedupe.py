@@ -180,26 +180,42 @@ def main():
     """
     Main entry point: load sources, merge, write canonical CSV.
     """
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Merge and deduplicate book data into canonical CSV')
+    parser.add_argument('--dataset', type=str, default='datasets/default',
+                       help='Dataset root directory (default: datasets/default)')
+    
+    args = parser.parse_args()
+    
     project_root = Path(__file__).parent.parent
-    sources_dir = project_root / 'sources'
-    books_csv = project_root / 'books.csv'
-    reports_dir = project_root / 'reports'
+    dataset_root = project_root / args.dataset
+    sources_dir = dataset_root / 'sources'
+    books_csv = dataset_root / 'books.csv'
+    reports_dir = dataset_root / 'reports'
     duplicates_report = reports_dir / 'possible_duplicates.csv'
+    
+    # Ensure directories exist
+    dataset_root.mkdir(parents=True, exist_ok=True)
+    sources_dir.mkdir(parents=True, exist_ok=True)
+    reports_dir.mkdir(parents=True, exist_ok=True)
     
     print("=" * 60)
     print("Books CSV Merge and Deduplication")
+    print(f"Dataset: {dataset_root}")
     print("=" * 60)
     
     # Load existing canonical CSV
     print(f"\nLoading existing books.csv...")
-    existing_books = read_csv_safe(str(books_csv))
-    print(f"  Found {len(existing_books)} existing books")
+    existing_books = []
+    if books_csv.exists():
+        existing_books = read_csv_safe(str(books_csv))
+        print(f"  Found {len(existing_books)} existing books")
+    else:
+        print(f"  No existing books.csv found (will create new)")
     
     # Load all canonical source data
     print(f"\nLoading canonical source data from {sources_dir}...")
-    if not sources_dir.exists():
-        print(f"  Creating sources directory...")
-        sources_dir.mkdir()
     
     new_books = load_all_sources(sources_dir)
     

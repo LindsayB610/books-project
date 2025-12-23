@@ -110,8 +110,21 @@ def print_duplicate_report(duplicates: List[Tuple[Dict, Dict, float, str]]):
 
 def main():
     """Main entry point."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Find possible duplicate books in books.csv')
+    parser.add_argument('--dataset', type=str, default='datasets/default',
+                       help='Dataset root directory (default: datasets/default)')
+    parser.add_argument('--csv', type=str, help='Path to books.csv (overrides --dataset)')
+    
+    args = parser.parse_args()
+    
     project_root = Path(__file__).parent.parent
-    books_csv = project_root / 'books.csv'
+    if args.csv:
+        books_csv = Path(args.csv)
+    else:
+        dataset_root = project_root / args.dataset
+        books_csv = dataset_root / 'books.csv'
     
     if not books_csv.exists():
         print(f"Error: {books_csv} not found.")

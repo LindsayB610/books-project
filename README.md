@@ -2,35 +2,70 @@
 
 A system for building and maintaining a canonical `books.csv` that represents your reading history and preferences, merging data from multiple sources (Goodreads, Kindle, physical shelves) while preserving your manual annotations.
 
+## Dataset-Per-User Architecture
+
+This project supports multiple user datasets. Each dataset is self-contained in its own directory:
+
+```
+datasets/
+├── default/          # Default dataset (used if --dataset not specified)
+│   ├── sources/      # Input data (Goodreads export, etc.)
+│   ├── books.csv     # Canonical output (edit this!)
+│   └── reports/      # Validation and duplicate reports
+├── lindsay/          # Example: user-specific dataset
+│   ├── sources/
+│   ├── books.csv
+│   └── reports/
+└── user_123/         # Example: another user dataset
+    ├── sources/
+    ├── books.csv
+    └── reports/
+```
+
+All scripts accept a `--dataset` argument (default: `datasets/default`). This allows you to:
+- Maintain separate reading histories for different users
+- Test changes on a separate dataset
+- Keep multiple book collections organized
+
 ## Quick Start
 
-1. Place your data sources in the `sources/` directory:
+1. Create your dataset directory (or use the default):
+   ```bash
+   mkdir -p datasets/default/sources
+   ```
+
+2. Place your data sources in `datasets/default/sources/`:
    - `goodreads_export.csv` - Export from Goodreads
    - `kindle_library.json` or `.csv` - Kindle library data
    - `physical_shelf_photos/` - Photos of your bookshelves (deferred)
 
-2. Run the ingestion pipeline:
+3. Ingest Goodreads data:
    ```bash
-   python scripts/merge_and_dedupe.py
+   python scripts/ingest_goodreads.py --dataset datasets/default
    ```
 
-3. Validate your data:
+4. Run the merge pipeline:
    ```bash
-   python scripts/validate.py
+   python scripts/merge_and_dedupe.py --dataset datasets/default
    ```
 
-4. Check for possible duplicates:
+5. Validate your data:
    ```bash
-   python scripts/find_duplicates.py
+   python scripts/validate_books_csv.py --dataset datasets/default
    ```
 
-5. Manually edit `books.csv` to add your preferences for:
+6. Check for possible duplicates:
+   ```bash
+   python scripts/find_duplicates.py --dataset datasets/default
+   ```
+
+7. Manually edit `datasets/default/books.csv` to add your preferences for:
    - ~10-20 all-time favorites (set `anchor_type` to `all_time_favorite`)
    - ~20 recent reads (set `anchor_type` to `recent_hit` or `recent_miss`)
 
-6. Generate recommendations:
+8. Generate recommendations:
    ```bash
-   python scripts/recommend.py
+   python scripts/recommend.py --dataset datasets/default --query "urban fantasy"
    ```
 
 ## Philosophy
@@ -48,11 +83,15 @@ See `DESIGN.md` for the complete schema and merge rules.
 
 ```
 books-project/
-├── books.csv              # Canonical output (edit this!)
-├── sources/               # Input data
-├── scripts/               # Ingestion scripts
-├── utils/                 # Utilities
-└── DESIGN.md             # Full design documentation
+├── datasets/              # User datasets (dataset-per-user)
+│   └── default/          # Default dataset
+│       ├── sources/      # Input data
+│       ├── books.csv     # Canonical output (edit this!)
+│       └── reports/      # Validation and duplicate reports
+├── scripts/              # Ingestion scripts
+├── utils/                # Utilities
+├── DESIGN.md             # Full design documentation
+└── README.md             # This file
 ```
 
 ## Manual Fields (Protected)
@@ -67,11 +106,33 @@ These fields are never overwritten by the pipeline once you set them:
 
 ## Scripts
 
-- **`scripts/merge_and_dedupe.py`** - Main merge pipeline (ingests sources, deduplicates, merges)
-- **`scripts/validate.py`** - Validates data quality and flags issues
-- **`scripts/find_duplicates.py`** - Finds and reports possible duplicates using fuzzy matching
-- **`scripts/recommend.py`** - Generates recommendations based on anchor books
+All scripts support `--dataset` argument (default: `datasets/default`):
+
 - **`scripts/ingest_goodreads.py`** - Converts Goodreads export to canonical format
+  ```bash
+  python scripts/ingest_goodreads.py --dataset datasets/default
+  ```
+
+- **`scripts/merge_and_dedupe.py`** - Main merge pipeline (ingests sources, deduplicates, merges)
+  ```bash
+  python scripts/merge_and_dedupe.py --dataset datasets/default
+  ```
+
+- **`scripts/validate_books_csv.py`** - Validates data quality and flags issues
+  ```bash
+  python scripts/validate_books_csv.py --dataset datasets/default
+  ```
+
+- **`scripts/find_duplicates.py`** - Finds and reports possible duplicates using fuzzy matching
+  ```bash
+  python scripts/find_duplicates.py --dataset datasets/default
+  ```
+
+- **`scripts/recommend.py`** - Generates recommendations based on anchor books
+  ```bash
+  python scripts/recommend.py --dataset datasets/default --query "urban fantasy" --limit 5
+  ```
+
 - **`scripts/ingest_kindle.py`** - Converts Kindle library to canonical format
 
 ## Features
@@ -91,12 +152,33 @@ These fields are never overwritten by the pipeline once you set them:
 - Extracts tones, vibes, genres, favorite elements
 - Scores unread books based on preference matching
 
+## Example: Working with Multiple Datasets
+
+```bash
+# Create a new dataset for a specific user
+mkdir -p datasets/lindsay/sources
+
+# Ingest Goodreads data for this user
+python scripts/ingest_goodreads.py --dataset datasets/lindsay
+
+# Merge and deduplicate
+python scripts/merge_and_dedupe.py --dataset datasets/lindsay
+
+# Validate
+python scripts/validate_books_csv.py --dataset datasets/lindsay
+
+# Generate recommendations
+python scripts/recommend.py --dataset datasets/lindsay --query "mystery" --limit 5
+```
+
 ## Next Steps
 
 1. Review `DESIGN.md` for the full specification
-2. Add your source data to `sources/`
-3. Run the pipeline: `python scripts/merge_and_dedupe.py`
-4. Validate: `python scripts/validate.py`
-5. Manually enrich your anchor books in `books.csv`
-6. Generate recommendations: `python scripts/recommend.py`
+2. Create your dataset: `mkdir -p datasets/default/sources`
+3. Add your source data to `datasets/default/sources/`
+4. Ingest: `python scripts/ingest_goodreads.py --dataset datasets/default`
+5. Run the pipeline: `python scripts/merge_and_dedupe.py --dataset datasets/default`
+6. Validate: `python scripts/validate_books_csv.py --dataset datasets/default`
+7. Manually enrich your anchor books in `datasets/default/books.csv`
+8. Generate recommendations: `python scripts/recommend.py --dataset datasets/default`
 

@@ -401,7 +401,9 @@ def main():
     parser = argparse.ArgumentParser(description='Generate book recommendations from anchor books')
     parser.add_argument('-n', '--limit', type=int, default=5, help='Number of recommendations (default: 5, max: 5)')
     parser.add_argument('-q', '--query', type=str, help='Filter recommendations by query string (searches title/author)')
-    parser.add_argument('--csv', type=str, help='Path to books.csv (default: books.csv in project root)')
+    parser.add_argument('--dataset', type=str, default='datasets/default',
+                       help='Dataset root directory (default: datasets/default)')
+    parser.add_argument('--csv', type=str, help='Path to books.csv (overrides --dataset)')
     
     args = parser.parse_args()
     
@@ -409,7 +411,11 @@ def main():
     num_recs = max(3, min(5, args.limit))
     
     project_root = Path(__file__).parent.parent
-    books_csv = Path(args.csv) if args.csv else project_root / 'books.csv'
+    if args.csv:
+        books_csv = Path(args.csv)
+    else:
+        dataset_root = project_root / args.dataset
+        books_csv = dataset_root / 'books.csv'
     
     if not books_csv.exists():
         print(f"Error: {books_csv} not found.")

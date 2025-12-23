@@ -211,14 +211,26 @@ def main():
     """
     Convert Goodreads export to canonical format.
     """
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Convert Goodreads export to canonical format')
+    parser.add_argument('--dataset', type=str, default='datasets/default',
+                       help='Dataset root directory (default: datasets/default)')
+    
+    args = parser.parse_args()
+    
     project_root = Path(__file__).parent.parent
-    sources_dir = project_root / 'sources'
+    dataset_root = project_root / args.dataset
+    sources_dir = dataset_root / 'sources'
     goodreads_file = sources_dir / 'goodreads_export.csv'
     output_file = sources_dir / 'goodreads_canonical.csv'
     
+    # Ensure sources directory exists
+    sources_dir.mkdir(parents=True, exist_ok=True)
+    
     if not goodreads_file.exists():
         print(f"Error: {goodreads_file} not found.")
-        print("Please export your Goodreads library and save it as 'goodreads_export.csv' in the sources/ directory.")
+        print(f"Please export your Goodreads library and save it as 'goodreads_export.csv' in {sources_dir}/")
         return
     
     print(f"Reading Goodreads export from {goodreads_file}...")
@@ -235,7 +247,7 @@ def main():
     # Use full canonical schema
     CANONICAL_FIELDS = [
         'work_id', 'isbn13', 'asin', 'title', 'author', 'publication_year', 'publisher',
-        'language', 'pages', 'genres', 'description', 'formats', 'physical_owned',
+        'language', 'pages', 'genres', 'tags', 'description', 'formats', 'physical_owned',
         'kindle_owned', 'audiobook_owned', 'goodreads_id', 'goodreads_url',
         'sources', 'date_added', 'date_read', 'date_updated',
         'read_status', 'rating', 'reread', 'reread_count', 'dnf', 'dnf_reason',
