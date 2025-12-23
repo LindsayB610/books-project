@@ -59,13 +59,41 @@ def is_manually_set(value: Optional[str]) -> bool:
     return value is not None and value.strip() != ''
 
 
+def union_pipe(existing: Optional[str], new: Optional[str]) -> Optional[str]:
+    """
+    Union two pipe-delimited strings, returning a sorted pipe-delimited result.
+    
+    Args:
+        existing: Existing pipe-delimited string (e.g., "kindle|physical")
+        new: New pipe-delimited string (e.g., "kindle|audiobook")
+    
+    Returns:
+        Unioned, sorted pipe-delimited string (e.g., "audiobook|kindle|physical")
+        or None if result is empty
+    """
+    existing_set = set()
+    if existing:
+        existing_set = {v.strip() for v in existing.split('|') if v.strip()}
+    
+    new_set = set()
+    if new:
+        new_set = {v.strip() for v in new.split('|') if v.strip()}
+    
+    combined = existing_set | new_set
+    if not combined:
+        return None
+    
+    # Return sorted, pipe-delimited string (deterministic)
+    return '|'.join(sorted(combined))
+
+
 # Protected fields that should never be overwritten
 PROTECTED_FIELDS = {
     'work_id',  # Stable identifier, preserve once set
     'rating', 'reread', 'reread_count', 'dnf', 'dnf_reason',
     'pacing_rating', 'tone', 'vibe', 'what_i_wanted', 'did_it_deliver',
     'favorite_elements', 'pet_peeves', 'notes', 'anchor_type',
-    'read_status', 'date_read', 'would_recommend'
+    'read_status', 'would_recommend'
 }
 
 
@@ -76,7 +104,7 @@ def safe_merge(existing: Dict, new: Dict) -> Dict:
     Rules:
     - Protected fields: only update if existing is empty
     - Safe fields: update if new data is more complete (not empty)
-    - Always combine formats and sources (union)
+    - Pipe-delimited fields (formats, sources, tags): always union (combine unique values)
     - Preserve work_id from existing (stable identifier)
     """
     merged = existing.copy()
@@ -104,20 +132,9 @@ def safe_merge(existing: Dict, new: Dict) -> Dict:
                 merged[key] = new_value
             # Otherwise, keep existing value
         
-        # Special handling for formats and sources (union)
-        elif key == 'formats':
-            existing_formats = set((existing_value or '').split(','))
-            new_formats = set((new_value or '').split(','))
-            combined = existing_formats | new_formats
-            combined.discard('')  # Remove empty strings
-            merged[key] = ','.join(sorted(combined)) if combined else None
-        
-        elif key == 'sources':
-            existing_sources = set((existing_value or '').split(','))
-            new_sources = set((new_value or '').split(','))
-            combined = existing_sources | new_sources
-            combined.discard('')
-            merged[key] = ','.join(sorted(combined)) if combined else None
+        # Special handling for pipe-delimited multi-valued fields (union)
+        elif key in ('formats', 'sources', 'tags'):
+            merged[key] = union_pipe(existing_value, new_value)
         
         # Safe fields: update if new value is more complete
         else:

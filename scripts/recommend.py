@@ -53,7 +53,7 @@ def extract_preferences(positive_anchors: List[Dict], negative_anchors: List[Dic
         # Tags (preferred) and genres (fallback for future enrichment)
         tags_str = book.get('tags', '').strip()
         if tags_str:
-            for tag in tags_str.replace('|', ',').split(','):
+            for tag in tags_str.split('|'):
                 tag_clean = tag.strip().lower()
                 if tag_clean:
                     positive_genres.add(tag_clean)
@@ -61,7 +61,7 @@ def extract_preferences(positive_anchors: List[Dict], negative_anchors: List[Dic
         # Also check genres (for future enrichment)
         genres_str = book.get('genres', '').strip()
         if genres_str:
-            for genre in genres_str.replace('|', ',').split(','):
+            for genre in genres_str.split('|'):
                 genre_clean = genre.strip().lower()
                 if genre_clean:
                     positive_genres.add(genre_clean)
@@ -81,7 +81,7 @@ def extract_preferences(positive_anchors: List[Dict], negative_anchors: List[Dic
         # Tags (preferred) and genres (fallback for future enrichment)
         tags_str = book.get('tags', '').strip()
         if tags_str:
-            for tag in tags_str.replace('|', ',').split(','):
+            for tag in tags_str.split('|'):
                 tag_clean = tag.strip().lower()
                 if tag_clean:
                     negative_genres.add(tag_clean)
@@ -89,7 +89,7 @@ def extract_preferences(positive_anchors: List[Dict], negative_anchors: List[Dic
         # Also check genres (for future enrichment)
         genres_str = book.get('genres', '').strip()
         if genres_str:
-            for genre in genres_str.replace('|', ',').split(','):
+            for genre in genres_str.split('|'):
                 genre_clean = genre.strip().lower()
                 if genre_clean:
                     negative_genres.add(genre_clean)
@@ -196,7 +196,7 @@ def score_book(book: Dict, preferences: Dict, query: str = None) -> Tuple[float,
     # Prefer tags (user shelves/labels)
     tags_str = book.get('tags', '').strip()
     if tags_str:
-        for tag in tags_str.replace('|', ',').split(','):
+        for tag in tags_str.split('|'):
             tag_clean = tag.strip().lower()
             if tag_clean:
                 book_genres.add(tag_clean)
@@ -204,7 +204,7 @@ def score_book(book: Dict, preferences: Dict, query: str = None) -> Tuple[float,
     # Also check genres (for future enrichment)
     genres_str = book.get('genres', '').strip()
     if genres_str:
-        for genre in genres_str.replace('|', ',').split(','):
+        for genre in genres_str.split('|'):
             genre_clean = genre.strip().lower()
             if genre_clean:
                 book_genres.add(genre_clean)
