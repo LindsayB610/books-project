@@ -12,6 +12,8 @@ This is a **books management system** that:
 
 **Core Philosophy**: The CSV is human-editable and safe. Manual fields are NEVER overwritten.
 
+**Prime Directive**: Never overwrite manual/protected fields.
+
 ## Project Structure
 
 ```
@@ -122,6 +124,126 @@ python scripts/recommendations_stub.py --format markdown > prompt.md
 python scripts/recommend.py -n 12
 ```
 
+## Python Best Practices
+
+### Project Philosophy
+
+This project is a data pipeline that produces a canonical `books.csv`. The CSV is the source of truth and is human-edited. Our job is to ingest, dedupe, merge, and validate without destroying user annotations.
+
+**Prime Directive**: Never overwrite manual/protected fields.
+
+### Code Style & Structure Rules
+
+#### File Size and Module Discipline
+- **Max file size**: 300 lines per Python file (excluding comments/docstrings)
+- If a script grows beyond this, split into:
+  - `utils/` modules for reusable logic
+  - `scripts/` as thin CLI wrappers
+- No "god scripts." `merge_and_dedupe.py` must orchestrate, not contain everything
+
+#### Clear Separation of Concerns
+- **`scripts/`** = CLI entry points only (argparse, printing summaries, calling library functions)
+- **`utils/`** = pure functions and reusable logic (normalization, matching, merging, IO)
+- Avoid circular imports. Prefer simple dependency direction:
+  ```
+  scripts → utils → standard library
+  ```
+
+#### Determinism
+Pipeline runs must be deterministic:
+- Stable ordering
+- Stable IDs
+- Stable output formatting
+- Randomness is not allowed unless explicitly seeded and justified
+
+### CSV Handling Rules (Critical)
+
+#### CSV is Sacred
+Treat `books.csv` as a user-owned artifact:
+- Preserve column order
+- Preserve manual edits
+- Preserve work_id stability
+- Never auto-delete rows
+- Never auto-merge "uncertain matches"
+
+#### Protected/Manual Fields
+- Protected fields must never be overwritten once populated (unless user explicitly requests)
+- If a protected field exists in `books.csv`, new ingestion data must not replace it
+- If protected field is empty, it can be filled
+
+#### Always Preserve Raw Inputs
+- Raw source files in `sources/` must be treated as immutable inputs
+- Never modify raw exports; normalize in-memory or via intermediate outputs only
+
+#### Delimiters & Quoting
+- Use the CSV utilities (no ad-hoc CSV writing)
+- Quote correctly
+- For multi-valued fields (genres, formats, sources), use one delimiter consistently (recommend `|`)
+
+### Dedupe and Merge Rules
+
+#### Matching Precedence
+1. `isbn13`
+2. `asin`
+3. Strict title+author match
+4. Bounded fuzzy (only as last resort)
+
+#### False Merges are Worse than Duplicates
+- If confidence is below threshold:
+  - Do not merge
+  - Emit a "possible duplicates" report
+
+#### Merge Strategy
+- Prefer keeping two records separate over collapsing incorrectly
+- Metadata fields may be filled only if missing
+- Union list-like fields (formats, sources)
+- Never downgrade information (don't replace a populated field with blank)
+
+### Validation Requirements
+
+Any change to ingestion/merge logic must include running (or updating) validation.
+
+Validation should check:
+- Duplicate `work_id`
+- Duplicate `isbn13` / `asin`
+- Missing required fields (title, author)
+- Invalid enums (`read_status`, `anchor_type`)
+- Invalid numeric fields (rating, reread_count)
+- Date formats
+
+**Validation scripts should report issues, not auto-fix them.**
+
+### Logging and Reporting
+
+Print concise, human-readable summaries:
+- Number of rows ingested
+- Number of merges performed
+- Number of new rows created
+- Number of ambiguous matches flagged
+
+Write "possible duplicates" output to a file for manual review (CSV or JSON).
+
+### Testing Expectations (Lightweight)
+
+We are not building a huge test suite, but we require:
+- Unit tests for normalization and dedupe edge cases, OR
+- Golden-file tests for small sample CSV inputs
+
+At minimum:
+- Add a tiny fixture set under `tests/fixtures/` and a sanity script
+
+### Anti-patterns (Do Not Do These)
+
+- ❌ No "smart" auto-fixing user data
+- ❌ No rewriting `books.csv` formatting beyond what's necessary
+- ❌ No adding dependencies unless clearly justified (standard library preferred)
+- ❌ No speculative architecture (no DB, no ORM, no embeddings yet)
+- ❌ No silent behavior changes: update docs if behavior changes
+
+### When in Doubt
+
+Ask the user or emit a report. Do not guess.
+
 ## Code Patterns
 
 ### Reading CSV Safely
@@ -187,6 +309,19 @@ matches = find_matches(new_book, existing_books)
 - Performance is not a concern yet
 - Focus on correctness and maintainability
 
+### ❌ Don't Create God Scripts
+- Keep scripts under 300 lines
+- Split logic into `utils/` modules
+- Scripts should orchestrate, not contain everything
+
+### ❌ Don't Modify Raw Source Files
+- Treat `sources/` files as immutable
+- Normalize in-memory or via intermediate outputs only
+
+### ❌ Don't Add Unnecessary Dependencies
+- Prefer standard library
+- Only add dependencies if clearly justified
+
 ## Testing Recommendations
 
 When making changes:
@@ -195,6 +330,11 @@ When making changes:
 3. Verify protected fields are preserved
 4. Check deduplication doesn't create false merges
 5. Ensure backward compatibility
+
+### Testing Requirements
+- Unit tests for normalization and dedupe edge cases, OR
+- Golden-file tests for small sample CSV inputs
+- At minimum: add fixtures under `tests/fixtures/` and a sanity script
 
 ## Key Files to Understand
 
