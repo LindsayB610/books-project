@@ -88,7 +88,7 @@ def validate_work_ids(books: List[Dict], report: ValidationReport):
     work_id_map = defaultdict(list)
     
     for idx, book in enumerate(books):
-        work_id = book.get('work_id', '').strip()
+        work_id = (book.get('work_id') or '').strip()
         if not work_id:
             report.add_error("Missing work_id", book)
         else:
@@ -107,7 +107,7 @@ def validate_identifiers(books: List[Dict], report: ValidationReport):
     asin_map = defaultdict(list)
     
     for idx, book in enumerate(books):
-        isbn13 = book.get('isbn13', '').strip()
+        isbn13 = (book.get('isbn13') or '').strip()
         if isbn13:
             normalized = normalize_isbn13(isbn13)
             if not normalized:
@@ -115,7 +115,7 @@ def validate_identifiers(books: List[Dict], report: ValidationReport):
             else:
                 isbn_map[normalized].append((idx, book))
         
-        asin = book.get('asin', '').strip()
+        asin = (book.get('asin') or '').strip()
         if asin:
             normalized = normalize_asin(asin)
             if not normalized:
@@ -142,7 +142,7 @@ def validate_required_fields(books: List[Dict], report: ValidationReport):
     
     for book in books:
         for field in required_fields:
-            value = book.get(field, '').strip() if book.get(field) else ''
+            value = (book.get(field) or '').strip()
             if not value:
                 report.add_error(f"Missing required field: {field}", book)
 
@@ -150,7 +150,7 @@ def validate_required_fields(books: List[Dict], report: ValidationReport):
 def validate_ratings(books: List[Dict], report: ValidationReport):
     """Validate rating values (1-5, allow halves)."""
     for book in books:
-        rating = book.get('rating', '').strip()
+        rating = (book.get('rating') or '').strip()
         if rating:
             try:
                 rating_val = float(rating)
@@ -167,7 +167,7 @@ def validate_ratings(books: List[Dict], report: ValidationReport):
 def validate_reread_count(books: List[Dict], report: ValidationReport):
     """Validate reread_count is an integer."""
     for book in books:
-        reread_count = book.get('reread_count', '').strip()
+        reread_count = (book.get('reread_count') or '').strip()
         if reread_count:
             try:
                 count = int(reread_count)
@@ -185,19 +185,19 @@ def validate_enums(books: List[Dict], report: ValidationReport):
     
     for book in books:
         # read_status
-        read_status = book.get('read_status', '').strip().lower()
+        read_status = (book.get('read_status') or '').strip().lower()
         if read_status and read_status not in valid_read_status:
             report.add_warning(f"Invalid read_status: {read_status} (expected: {', '.join(valid_read_status - {''})})", book)
         
         # anchor_type
-        anchor_type = book.get('anchor_type', '').strip().lower()
+        anchor_type = (book.get('anchor_type') or '').strip().lower()
         if anchor_type and anchor_type not in valid_anchor_type:
             report.add_warning(f"Invalid anchor_type: {anchor_type} (expected: {', '.join(valid_anchor_type - {''})})", book)
         
         # Boolean fields (0/1)
         boolean_fields = ['reread', 'dnf', 'did_it_deliver', 'would_recommend']
         for field in boolean_fields:
-            value = book.get(field, '').strip()
+            value = (book.get(field) or '').strip()
             if value and value not in valid_boolean_fields:
                 report.add_warning(f"Invalid {field} value: {value} (expected: 0, 1, or empty)", book)
 
@@ -208,7 +208,7 @@ def validate_delimiters(books: List[Dict], report: ValidationReport):
     
     for book in books:
         for field in pipe_delimited_fields:
-            value = book.get(field, '').strip()
+            value = (book.get(field) or '').strip()
             if value:
                 # Check if it contains commas (which suggests wrong delimiter)
                 if ',' in value and '|' not in value:

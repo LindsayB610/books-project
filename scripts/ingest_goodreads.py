@@ -33,7 +33,7 @@ def map_goodreads_to_canonical(goodreads_row: dict) -> dict:
     # Identifiers
     # isbn13 <- ISBN13 (fallback to ISBN if ISBN13 missing)
     # Normalize using normalize_isbn13; if normalization fails, set to None (do NOT keep dirty raw values)
-    isbn13_raw = goodreads_row.get('ISBN13', '').strip() or goodreads_row.get('ISBN', '').strip()
+    isbn13_raw = (goodreads_row.get('ISBN13') or '').strip() or (goodreads_row.get('ISBN') or '').strip()
     if isbn13_raw:
         normalized = normalize_isbn13(isbn13_raw)
         canonical['isbn13'] = normalized if normalized else None  # Only use if normalization succeeds
@@ -43,28 +43,34 @@ def map_goodreads_to_canonical(goodreads_row: dict) -> dict:
     canonical['asin'] = None  # Goodreads doesn't have ASIN
     
     # Basic info
-    canonical['title'] = goodreads_row.get('Title', '').strip() or None
-    canonical['author'] = goodreads_row.get('Author', '').strip() or None
+    canonical['title'] = (goodreads_row.get('Title') or '').strip() or None
+    canonical['author'] = (goodreads_row.get('Author') or '').strip() or None
     
     # Metadata
     # publication_year <- Year Published (fallback to Original Publication Year)
     canonical['publication_year'] = (
-        goodreads_row.get('Year Published', '').strip() or 
-        goodreads_row.get('Original Publication Year', '').strip() or 
+        (goodreads_row.get('Year Published') or '').strip() or 
+        (goodreads_row.get('Original Publication Year') or '').strip() or 
         None
     )
-    canonical['publisher'] = goodreads_row.get('Publisher', '').strip() or None
+    canonical['publisher'] = (goodreads_row.get('Publisher') or '').strip() or None
     canonical['language'] = None  # Goodreads doesn't have language
-    canonical['pages'] = goodreads_row.get('Number of Pages', '').strip() or None
+    canonical['pages'] = (goodreads_row.get('Number of Pages') or '').strip() or None
     
     # genres = None (reserved for external genre enrichment)
     canonical['genres'] = None
     
     # tags <- Bookshelves (user shelves/labels; convert comma-separated to pipe-delimited, lowercased)
-    bookshelves = goodreads_row.get('Bookshelves', '').strip()
+    # IMPORTANT: Tags must come from Bookshelves column, NOT Exclusive Shelf
+    # Filter out "currently-reading" and "to-read" as they are status indicators, not tags
+    bookshelves = (goodreads_row.get('Bookshelves') or '').strip()
     if bookshelves:
         # Convert comma-separated to pipe-delimited, lowercase tags
         tags = [tag.strip().lower() for tag in bookshelves.split(',') if tag.strip()]
+        # Filter out status indicators that are redundant with read_status
+        # These should not appear in tags even if they're in Bookshelves
+        status_indicators = {'currently-reading', 'to-read', 'read'}
+        tags = [tag for tag in tags if tag not in status_indicators]
         canonical['tags'] = '|'.join(tags) if tags else None
     else:
         canonical['tags'] = None
@@ -76,7 +82,7 @@ def map_goodreads_to_canonical(goodreads_row: dict) -> dict:
     
     # Ownership
     # physical_owned <- 1 if Owned Copies > 0 else 0 (if parse fails, set to None)
-    owned_copies = goodreads_row.get('Owned Copies', '').strip()
+    owned_copies = (goodreads_row.get('Owned Copies') or '').strip()
     if owned_copies:
         try:
             owned_count = int(owned_copies)
@@ -91,7 +97,7 @@ def map_goodreads_to_canonical(goodreads_row: dict) -> dict:
     
     # Source provenance
     # goodreads_id <- Book Id
-    canonical['goodreads_id'] = goodreads_row.get('Book Id', '').strip() or None
+    canonical['goodreads_id'] = (goodreads_row.get('Book Id') or '').strip() or None
     # goodreads_url <- https://www.goodreads.com/book/show/{goodreads_id}
     canonical['goodreads_url'] = (
         f"https://www.goodreads.com/book/show/{canonical['goodreads_id']}" 
@@ -102,7 +108,7 @@ def map_goodreads_to_canonical(goodreads_row: dict) -> dict:
     # Dates
     # date_added <- Date Added (normalize to YYYY-MM-DD)
     # Accept %Y/%m/%d, %Y-%m-%d, and if encountered %Y/%m or %Y-%m leave as-is
-    date_added = goodreads_row.get('Date Added', '').strip()
+    date_added = (goodreads_row.get('Date Added') or '').strip()
     if date_added:
         try:
             if '/' in date_added:
@@ -143,7 +149,7 @@ def map_goodreads_to_canonical(goodreads_row: dict) -> dict:
     # read_status - Use Exclusive Shelf as the ONLY source
     # read -> read, currently-reading -> reading, to-read -> want_to_read
     # Do NOT infer from rating or Bookshelves
-    exclusive_shelf = goodreads_row.get('Exclusive Shelf', '').strip().lower()
+    exclusive_shelf = (goodreads_row.get('Exclusive Shelf') or '').strip().lower()
     if exclusive_shelf == 'read':
         canonical['read_status'] = 'read'
     elif exclusive_shelf == 'currently-reading':
@@ -154,15 +160,22 @@ def map_goodreads_to_canonical(goodreads_row: dict) -> dict:
         canonical['read_status'] = None
     
     # rating <- My Rating (allow blank)
-    rating = goodreads_row.get('My Rating', '').strip()
+    # Goodreads exports sometimes use "0" to mean "no rating"
+    # Only set rating when it's 1-5 (valid numeric rating)
+    rating = (goodreads_row.get('My Rating') or '').strip()
     if rating and rating.isdigit():
-        canonical['rating'] = rating
+        rating_int = int(rating)
+        # Treat 0 as "no rating" (None), only accept 1-5
+        if 1 <= rating_int <= 5:
+            canonical['rating'] = rating
+        else:
+            canonical['rating'] = None
     else:
         canonical['rating'] = None
     
     # reread_count <- Read Count (int, default 0)
     # reread <- 1 if reread_count > 1 else 0
-    read_count = goodreads_row.get('Read Count', '').strip()
+    read_count = (goodreads_row.get('Read Count') or '').strip()
     if read_count:
         try:
             count = int(read_count)
@@ -189,8 +202,8 @@ def map_goodreads_to_canonical(goodreads_row: dict) -> dict:
     canonical['pet_peeves'] = None
     
     # notes <- My Review + Private Notes (append with labels)
-    my_review = goodreads_row.get('My Review', '').strip()
-    private_notes = goodreads_row.get('Private Notes', '').strip()
+    my_review = (goodreads_row.get('My Review') or '').strip()
+    private_notes = (goodreads_row.get('Private Notes') or '').strip()
     
     if my_review and private_notes:
         canonical['notes'] = f"My Review: {my_review}\n\nPrivate Notes: {private_notes}"

@@ -30,14 +30,14 @@ def generate_work_id(book: Dict, existing_work_id: Optional[str] = None) -> str:
         return book.get('work_id').strip()
     
     # Generate stable ID based on identifiers
-    isbn13 = book.get('isbn13', '').strip()
+    isbn13 = (book.get('isbn13') or '').strip()
     if isbn13:
         # Normalize ISBN13 (remove hyphens)
         isbn_clean = isbn13.replace('-', '').replace(' ', '')
         if len(isbn_clean) == 13 and isbn_clean.isdigit():
             return f"isbn13:{isbn_clean}"
     
-    asin = book.get('asin', '').strip()
+    asin = (book.get('asin') or '').strip()
     if asin:
         # ASINs are typically 10 characters
         asin_clean = asin.upper().strip()
@@ -45,8 +45,8 @@ def generate_work_id(book: Dict, existing_work_id: Optional[str] = None) -> str:
             return f"asin:{asin_clean}"
     
     # Fallback: hash of title+author
-    title = book.get('title', '').strip()
-    author = book.get('author', '').strip()
+    title = (book.get('title') or '').strip()
+    author = (book.get('author') or '').strip()
     
     if title and author:
         # Normalize for stability
