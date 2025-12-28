@@ -3,6 +3,7 @@ sources/*
 !sources/README.md
 *.csv
 !books.csv
+!datasets/**/*.csv
 
 # Python
 __pycache__/
