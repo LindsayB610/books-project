@@ -1,29 +1,48 @@
-# Source data (may contain personal information)
-sources/*
-!sources/README.md
-*.csv
-!books.csv
-!datasets/**/*.csv
-
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
 venv/
+env/
 ENV/
 .venv
+
+# Environment variables
+.env
+.env.local
+.env.*.local
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
+*.sublime-project
+*.sublime-workspace
 
 # OS
 .DS_Store
 Thumbs.db
 
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+
+# Logs
+*.log
+
+# Dataset sources (user data - should be gitignored)
+datasets/*/sources/
+datasets/*/reports/
+
+# Keep datasets structure but ignore user data
+!datasets/*/README.md

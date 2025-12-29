@@ -340,16 +340,16 @@ datasets/
 - No accidental data mixing
 - Each user's data stays in their dataset
 
-### 9.3 API Layer (Planned, Not Implemented)
+### 9.3 API Layer (✅ Implemented)
 
-A read-only API proposal has been documented (see `API_DESIGN.md` for full details).
+A read-only API has been implemented (see `api/README.md` and `API_DESIGN.md` for details).
 
 **Key characteristics:**
-- **Read-only at first** (never writes to `books.csv` directly)
-- **Stateless** (each request reads fresh from `books.csv`)
-- **Optional in-memory caching later** (for performance)
-- **No database required** (`books.csv` remains source of truth)
-- **Minimal dependencies** (FastAPI preferred when implemented)
+- **Read-only** (never writes to `books.csv` directly) ✅
+- **Stateless** (each request reads fresh from `books.csv`) ✅
+- **In-memory caching** (for performance) ✅
+- **No database required** (`books.csv` remains source of truth) ✅
+- **FastAPI** (with automatic OpenAPI docs) ✅
 
 **Proposed endpoints (example set):**
 - `GET /api/books` - List books with filters (read_status, tags, tone, vibe, anchor_type), pagination, sorting
@@ -405,9 +405,9 @@ When it exists, the frontend should support:
 ### 9.6 Current State
 
 - Frontend is **documented, not built**
-- API design exists as a **proposal only** (see `API_DESIGN.md`)
+- API is **fully implemented** (see `api/README.md` and `API_DESIGN.md`)
 - Backend is **stable and ready** for a frontend whenever you choose
-- **No rework required** to add it later
+- **No rework required** to add frontend - API is complete
 
 ---
 

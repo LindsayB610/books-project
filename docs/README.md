@@ -7,7 +7,7 @@ This directory contains all project documentation.
 - **`DESIGN.md`** - Complete schema specification and design document
 - **`API_DESIGN.md`** - API layer design proposal (read-only REST API)
 - **`PROJECT_BACKGROUND.md`** - Project background, goals, and rationale
-- **`agents.md`** - Guide for AI assistants working with this project
+- **`agents.md`** - Guide for AI assistants working with this project (see `../agents.md`)
 
 ## Planning & Reviews
 

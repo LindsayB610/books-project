@@ -14,7 +14,7 @@ This is a **books management system** that:
 
 **Prime Directive**: Never overwrite manual/protected fields.
 
-**For detailed project background, goals, and design rationale, see:** [`PROJECT_BACKGROUND.md`](./PROJECT_BACKGROUND.md)
+**For detailed project background, goals, and design rationale, see:** [`docs/PROJECT_BACKGROUND.md`](./docs/PROJECT_BACKGROUND.md)
 
 ## Project Structure
 
@@ -51,11 +51,11 @@ books-project/
 │   ├── deduplication.py         # Matching logic (strict fuzzy matching)
 │   ├── normalization.py         # Title/author/identifier normalization
 │   └── work_id.py               # Stable ID generation
-└── docs/                        # Documentation
-    ├── DESIGN.md                # Complete schema specification
-    ├── API_DESIGN.md            # API design proposal
-    ├── PROJECT_BACKGROUND.md    # Project background and rationale
-    └── agents.md                # This file
+├── docs/                        # Documentation
+│   ├── DESIGN.md                # Complete schema specification
+│   ├── API_DESIGN.md            # API design proposal
+│   └── PROJECT_BACKGROUND.md    # Project background and rationale
+└── agents.md                    # This file
 ```
 
 ## Critical Rules

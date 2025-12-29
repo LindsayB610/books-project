@@ -218,7 +218,115 @@ def validate_delimiters(books: List[Dict], report: ValidationReport):
                     report.add_warning(f"Field {field} contains both commas and pipes - inconsistent delimiter", book)
 
 
-def validate_all(books: List[Dict]) -> ValidationReport:
+def validate_anchor_books(books: List[Dict], report: ValidationReport):
+    """Warn if anchor books are missing key preference data."""
+    anchor_types = ['all_time_favorite', 'recent_hit', 'recent_miss', 'dnf']
+    key_fields = {
+        'all_time_favorite': ['tone', 'vibe', 'favorite_elements'],
+        'recent_hit': ['tone', 'vibe', 'what_i_wanted', 'did_it_deliver'],
+        'recent_miss': ['tone', 'vibe', 'what_i_wanted', 'did_it_deliver', 'pet_peeves'],
+        'dnf': ['dnf_reason', 'pet_peeves']
+    }
+    
+    anchor_books = [b for b in books if (b.get('anchor_type') or '').strip() in anchor_types]
+    
+    if not anchor_books:
+        report.add_info("No anchor books found (anchor_type not set)")
+        return
+    
+    report.add_info(f"Found {len(anchor_books)} anchor book(s)")
+    
+    for book in anchor_books:
+        anchor_type = (book.get('anchor_type') or '').strip()
+        if anchor_type not in key_fields:
+            continue
+        
+        missing_fields = []
+        for field in key_fields[anchor_type]:
+            value = (book.get(field) or '').strip()
+            if not value:
+                missing_fields.append(field)
+        
+        if missing_fields:
+            report.add_warning(
+                f"Anchor book ({anchor_type}) missing key fields: {', '.join(missing_fields)}",
+                book
+            )
+
+
+def validate_recommendation_readiness(books: List[Dict], report: ValidationReport):
+    """Validate that enough anchor books exist for recommendations."""
+    anchor_books = [b for b in books if (b.get('anchor_type') or '').strip()]
+    
+    if not anchor_books:
+        report.add_warning("No anchor books found - recommendations will not work well")
+        report.add_info("💡 Tip: Set anchor_type on 10-20 favorite books and 20 recent reads")
+        return
+    
+    # Count by type
+    by_type = defaultdict(int)
+    for book in anchor_books:
+        anchor_type = (book.get('anchor_type') or '').strip()
+        if anchor_type:
+            by_type[anchor_type] += 1
+    
+    # Check for minimum recommended counts
+    if by_type.get('all_time_favorite', 0) < 5:
+        report.add_warning(
+            f"Only {by_type.get('all_time_favorite', 0)} all_time_favorite anchor(s) found. "
+            "Recommend at least 10-20 for best recommendations."
+        )
+    
+    recent_anchors = by_type.get('recent_hit', 0) + by_type.get('recent_miss', 0)
+    if recent_anchors < 5:
+        report.add_warning(
+            f"Only {recent_anchors} recent anchor(s) found (recent_hit + recent_miss). "
+            "Recommend at least 20 for best recommendations."
+        )
+    
+    if len(anchor_books) >= 10:
+        report.add_info(f"✅ Good anchor coverage: {len(anchor_books)} anchor books ({by_type})")
+
+
+def generate_completeness_report(books: List[Dict], report: ValidationReport):
+    """Generate statistics on field population."""
+    if not books:
+        return
+    
+    # Fields to track
+    metadata_fields = ['isbn13', 'asin', 'publication_year', 'publisher', 'pages', 'genres', 'tags', 'description']
+    preference_fields = ['rating', 'tone', 'vibe', 'pacing_rating', 'favorite_elements', 'pet_peeves', 'notes']
+    status_fields = ['read_status', 'anchor_type', 'would_recommend']
+    
+    total = len(books)
+    
+    # Calculate completeness
+    completeness = {}
+    for field in metadata_fields + preference_fields + status_fields:
+        populated = sum(1 for b in books if (b.get(field) or '').strip())
+        percentage = (populated / total * 100) if total > 0 else 0
+        completeness[field] = {'count': populated, 'percentage': percentage}
+    
+    # Report summary
+    report.add_info("Data Completeness Summary:")
+    
+    report.add_info(f"  Metadata fields:")
+    for field in metadata_fields:
+        stats = completeness[field]
+        report.add_info(f"    {field}: {stats['count']}/{total} ({stats['percentage']:.1f}%)")
+    
+    report.add_info(f"  Preference fields:")
+    for field in preference_fields:
+        stats = completeness[field]
+        report.add_info(f"    {field}: {stats['count']}/{total} ({stats['percentage']:.1f}%)")
+    
+    report.add_info(f"  Status fields:")
+    for field in status_fields:
+        stats = completeness[field]
+        report.add_info(f"    {field}: {stats['count']}/{total} ({stats['percentage']:.1f}%)")
+
+
+def validate_all(books: List[Dict], include_completeness: bool = True) -> ValidationReport:
     """Run all validation checks."""
     report = ValidationReport()
     
@@ -235,6 +343,11 @@ def validate_all(books: List[Dict]) -> ValidationReport:
     validate_reread_count(books, report)
     validate_enums(books, report)
     validate_delimiters(books, report)
+    validate_anchor_books(books, report)
+    validate_recommendation_readiness(books, report)
+    
+    if include_completeness:
+        generate_completeness_report(books, report)
     
     return report
 
@@ -243,10 +356,26 @@ def main():
     """Main entry point."""
     import argparse
     
-    parser = argparse.ArgumentParser(description='Validate books.csv for data quality issues')
+    parser = argparse.ArgumentParser(
+        description='Validate books.csv for data quality issues',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Validate default dataset
+  python scripts/validate_books_csv.py --dataset datasets/default
+  
+  # Validate without completeness report (faster)
+  python scripts/validate_books_csv.py --dataset datasets/default --no-completeness
+  
+  # Validate specific CSV file
+  python scripts/validate_books_csv.py --csv path/to/books.csv
+        """
+    )
     parser.add_argument('--dataset', type=str, default='datasets/default',
                        help='Dataset root directory (default: datasets/default)')
     parser.add_argument('--csv', type=str, help='Path to books.csv (overrides --dataset)')
+    parser.add_argument('--no-completeness', action='store_true',
+                       help='Skip data completeness report (faster for large datasets)')
     
     args = parser.parse_args()
     
@@ -266,7 +395,7 @@ def main():
     books = read_csv_safe(str(books_csv))
     
     print(f"Validating {len(books)} books...\n")
-    report = validate_all(books)
+    report = validate_all(books, include_completeness=not args.no_completeness)
     report.print_report()
     
     # Exit with error code if there are errors

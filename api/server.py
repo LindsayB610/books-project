@@ -5,10 +5,12 @@ Provides read-only REST API endpoints.
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Dict, Optional
 from pydantic import BaseModel
 import sys
 from pathlib import Path
+import os
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -21,6 +23,21 @@ app = FastAPI(
     title="Books CSV Builder + Recommender API",
     description="Read-only API for browsing, filtering, searching, and getting book recommendations",
     version="1.0.0"
+)
+
+# Configure CORS
+# Allow requests from the same domain and localhost for development
+allowed_origins = os.getenv(
+    "CORS_ORIGINS",
+    "https://bookshelf.lindsaybrunner.com,http://localhost:3000,http://localhost:5173,http://localhost:8080"
+).split(",")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[origin.strip() for origin in allowed_origins],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Initialize cache (default dataset)

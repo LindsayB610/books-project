@@ -2,7 +2,7 @@
 
 ## What Was Created
 
-A minimal test suite focused on data safety and critical logic, as specified in `agents.md`.
+A minimal test suite focused on data safety and critical logic, as specified in `../agents.md`.
 
 ### Test Files
 

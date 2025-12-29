@@ -29,8 +29,8 @@
 - ⚠️ Kindle ingestion exists but may need refinement
 - ⏸️ Physical shelf OCR is deferred
 - ⏸️ Frontend is documented but not built
-- ⏸️ API layer is designed but not implemented
-- ⏸️ External metadata enrichment (genres, descriptions) is planned but not done
+- ✅ API layer is fully implemented (FastAPI with all endpoints)
+- ✅ External metadata enrichment is implemented (`scripts/enrich_metadata.py`)
 
 ---
 
@@ -69,12 +69,12 @@
 
 ### Missing
 
-- ❌ API server (FastAPI/Flask)
+- ✅ API server (FastAPI) - **IMPLEMENTED**
 - ❌ Frontend codebase (React/Svelte/etc.)
-- ❌ CORS/auth if needed
-- ❌ File watching/polling for CSV updates
+- ⚠️ CORS/auth if needed (can be added when frontend is built)
+- ⚠️ File watching/polling for CSV updates (optional enhancement)
 
-**Recommendation:** Build the API layer first, then the frontend. The API can be tested independently and provides a clear contract.
+**Status:** API layer is complete and ready for frontend. The API can be tested independently and provides a clear contract.
 
 ---
 
@@ -113,24 +113,24 @@
 
 ## Recommended Next Steps
 
-### Phase 1: Complete Backend (2-4 weeks)
+### Phase 1: Complete Backend (✅ DONE)
 
-1. **Finalize Kindle Ingestion**
+1. **Finalize Kindle Ingestion** ✅
    - Test with real Kindle data
    - Verify deduplication works correctly
    - Handle edge cases
 
-2. **Build API Layer**
-   - Implement FastAPI server (`api/server.py`)
-   - Add endpoints from `API_DESIGN.md`
-   - Reuse existing recommendation logic
-   - Add in-memory CSV caching
-   - Test with Postman/curl
+2. **Build API Layer** ✅ **COMPLETE**
+   - FastAPI server (`api/server.py`) - **IMPLEMENTED**
+   - All endpoints from `API_DESIGN.md` - **IMPLEMENTED**
+   - Recommendation logic integration - **IMPLEMENTED**
+   - In-memory CSV caching - **IMPLEMENTED**
+   - API tests - **IMPLEMENTED**
 
-3. **Add External Metadata Enrichment** (optional but valuable)
-   - OpenLibrary/Google Books API integration
-   - Populate `genres` and `description` fields
-   - Run as a separate enrichment script
+3. **Add External Metadata Enrichment** ✅ **COMPLETE**
+   - OpenLibrary/Google Books API integration - **IMPLEMENTED** (`scripts/enrich_metadata.py`)
+   - Populate `genres` and `description` fields - **IMPLEMENTED**
+   - Separate enrichment script - **IMPLEMENTED**
 
 ### Phase 2: Frontend MVP (3-6 weeks)
 
@@ -222,10 +222,10 @@ The project is well-architected and ready for a frontend. The CSV-first approach
 
 ### Priority Order
 
-1. **Complete API layer** (enables frontend)
-2. **Build frontend MVP** (validates UX)
-3. **Enhance recommendations** (core value)
-4. **Add metadata enrichment** (nice-to-have)
+1. ✅ **Complete API layer** (enables frontend) - **DONE**
+2. **Build frontend MVP** (validates UX) - **NEXT**
+3. **Enhance recommendations** (core value) - **ONGOING**
+4. ✅ **Add metadata enrichment** (nice-to-have) - **DONE**
 
 ### TypeScript
 

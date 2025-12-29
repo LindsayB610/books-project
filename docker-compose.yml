@@ -1,0 +1,21 @@
+# Docker Compose configuration for Books API
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: books-api
+    ports:
+      - "8000:8000"
+    environment:
+      - BOOKS_DATASET=datasets/lindsay
+    volumes:
+      # Mount the dataset directory so books.csv can be updated without rebuilding
+      - ./datasets:/app/datasets:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
