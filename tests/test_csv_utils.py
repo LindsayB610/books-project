@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from utils.csv_utils import safe_merge, union_pipe, is_manually_set, PROTECTED_FIELDS
+from utils.csv_utils import safe_merge, union_pipe, is_manually_set, PROTECTED_FIELDS, write_csv_safe
 
 
 class TestSafeMerge:
@@ -226,4 +226,101 @@ class TestIsManuallySet:
         assert is_manually_set('') is False
         assert is_manually_set(None) is False
         assert is_manually_set('   ') is False  # Only whitespace
+
+
+class TestWriteCSVSafe:
+    """Tests for write_csv_safe() sorting behavior."""
+    
+    def test_sorts_by_author_then_title(self):
+        """CSV should be sorted by author (lowercase), then title (lowercase)."""
+        import tempfile
+        from pathlib import Path
+        import csv
+        
+        test_books = [
+            {'author': 'Zebra, Author', 'title': 'Book Z'},
+            {'author': 'Apple, Author', 'title': 'Book B'},
+            {'author': 'Apple, Author', 'title': 'Book A'},
+            {'author': 'Banana, Author', 'title': 'Book C'},
+        ]
+        
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv') as f:
+            temp_path = f.name
+        
+        try:
+            write_csv_safe(temp_path, test_books, ['author', 'title'])
+            
+            # Read back and verify order
+            with open(temp_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                result = list(reader)
+            
+            # Should be sorted: Apple A, Apple B, Banana C, Zebra Z
+            assert result[0]['author'] == 'Apple, Author'
+            assert result[0]['title'] == 'Book A'
+            assert result[1]['author'] == 'Apple, Author'
+            assert result[1]['title'] == 'Book B'
+            assert result[2]['author'] == 'Banana, Author'
+            assert result[3]['author'] == 'Zebra, Author'
+        finally:
+            Path(temp_path).unlink()
+    
+    def test_handles_empty_authors(self):
+        """Empty or None authors should be sorted to the beginning."""
+        import tempfile
+        from pathlib import Path
+        import csv
+        
+        test_books = [
+            {'author': 'Zebra, Author', 'title': 'Book Z'},
+            {'author': None, 'title': 'No Author Book'},
+            {'author': '', 'title': 'Empty Author Book'},
+            {'author': 'Apple, Author', 'title': 'Book A'},
+        ]
+        
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv') as f:
+            temp_path = f.name
+        
+        try:
+            write_csv_safe(temp_path, test_books, ['author', 'title'])
+            
+            # Read back
+            with open(temp_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                result = list(reader)
+            
+            # Empty/None authors should come first
+            assert result[0]['author'] in ('', None) or not result[0]['author']
+            assert result[-1]['author'] == 'Zebra, Author'
+        finally:
+            Path(temp_path).unlink()
+    
+    def test_case_insensitive_sorting(self):
+        """Sorting should be case-insensitive."""
+        import tempfile
+        from pathlib import Path
+        import csv
+        
+        test_books = [
+            {'author': 'zebra, author', 'title': 'Book Z'},
+            {'author': 'Apple, Author', 'title': 'Book A'},
+            {'author': 'BANANA, AUTHOR', 'title': 'Book B'},
+        ]
+        
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv') as f:
+            temp_path = f.name
+        
+        try:
+            write_csv_safe(temp_path, test_books, ['author', 'title'])
+            
+            # Read back
+            with open(temp_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                result = list(reader)
+            
+            # Should be sorted case-insensitively: Apple, BANANA, zebra
+            authors = [r['author'].lower() for r in result]
+            assert authors == sorted(authors, key=str.lower)
+        finally:
+            Path(temp_path).unlink()
 
