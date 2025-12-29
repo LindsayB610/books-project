@@ -53,6 +53,13 @@ End-to-end tests with fixture data:
 - Full pipeline with sample data
 - Data preservation through round-trip
 
+### `test_enrichment.py`
+Tests for metadata enrichment script:
+- ISBN extraction
+- Critical safety: never overwrite existing data (genres, description)
+- Google Books fallback logic
+- Error handling (API errors, missing data)
+
 ## Test Fixtures
 
 ### `fixtures/sample_books.csv`

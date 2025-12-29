@@ -150,6 +150,21 @@ All scripts support `--dataset` argument (default: `datasets/default`):
 
 - **`scripts/ingest_kindle.py`** - Converts Kindle library to canonical format
 
+- **`scripts/enrich_metadata.py`** - Enriches metadata from external APIs (OpenLibrary, Google Books)
+  ```bash
+  # Dry run to see what would be enriched
+  python scripts/enrich_metadata.py --dataset datasets/default --dry-run
+  
+  # Actually enrich (genres and descriptions)
+  python scripts/enrich_metadata.py --dataset datasets/default
+  
+  # Enrich only genres
+  python scripts/enrich_metadata.py --dataset datasets/default --fields genres
+  
+  # Use Google Books as fallback
+  python scripts/enrich_metadata.py --dataset datasets/default --use-google-books
+  ```
+
 ## API (Optional)
 
 A read-only REST API is available for browsing, filtering, searching, and getting recommendations:

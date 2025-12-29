@@ -73,6 +73,7 @@ pytest tests/ -v
 - **Deduplication**: Matching logic and thresholds
 - **Work ID**: Generation and stability
 - **CSV I/O**: Reading and writing integrity
+- **Metadata Enrichment**: Safety logic (never overwrite existing data), with mocked API calls
 
 ### ⚠️ Partially Covered
 
@@ -83,7 +84,7 @@ pytest tests/ -v
 - UI/UX behavior
 - Performance/optimization
 - Every possible edge case
-- External API calls
+- External API calls (real network requests - tested with mocks instead)
 
 ## Test Philosophy
 
