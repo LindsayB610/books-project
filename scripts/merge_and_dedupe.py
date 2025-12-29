@@ -56,7 +56,13 @@ def load_all_sources(sources_dir: Path) -> List[Dict]:
         all_books.extend(books)
         print(f"  Loaded {len(books)} books from Kindle")
     
-    # TODO: Physical shelf OCR canonical - if present
+    # Physical shelf canonical (output of ingest_shelf_photos.py) - if present
+    shelves_file = sources_dir / 'shelves_canonical.csv'
+    if shelves_file.exists():
+        print(f"Loading shelf photo canonical data from {shelves_file}...")
+        books = read_csv_safe(str(shelves_file))
+        all_books.extend(books)
+        print(f"  Loaded {len(books)} books from shelf photos")
     
     return all_books
 

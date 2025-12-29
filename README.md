@@ -150,6 +150,18 @@ All scripts support `--dataset` argument (default: `datasets/default`):
 
 - **`scripts/ingest_kindle.py`** - Converts Kindle library to canonical format
 
+- **`scripts/ingest_shelf_photos.py`** - Extracts books from shelf photos using OCR
+  ```bash
+  # Process shelf photos (requires Tesseract OCR installed)
+  python scripts/ingest_shelf_photos.py --dataset datasets/default shelf1.jpg shelf2.jpg
+  
+  # Dry run to see what would be extracted
+  python scripts/ingest_shelf_photos.py --dataset datasets/default --dry-run shelf1.jpg
+  
+  # Then merge into books.csv
+  python scripts/merge_and_dedupe.py --dataset datasets/default
+  ```
+
 - **`scripts/enrich_metadata.py`** - Enriches metadata from external APIs (OpenLibrary, Google Books)
   ```bash
   # Dry run to see what would be enriched

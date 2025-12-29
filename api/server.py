@@ -24,8 +24,10 @@ app = FastAPI(
 )
 
 # Initialize cache (default dataset)
-# Can be made configurable via environment variable or config file
-DEFAULT_DATASET = "datasets/default"
+# Can be configured via BOOKS_DATASET environment variable
+# Defaults to "datasets/default" if not set
+import os
+DEFAULT_DATASET = os.getenv("BOOKS_DATASET", "datasets/default")
 cache = BooksCache(DEFAULT_DATASET)
 
 

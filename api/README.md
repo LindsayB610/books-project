@@ -114,7 +114,20 @@ curl "http://localhost:8000/api/stats"
 
 ## Configuration
 
-The API currently uses the default dataset (`datasets/default`). To change this, modify `DEFAULT_DATASET` in `api/server.py` or make it configurable via environment variable.
+### Dataset Configuration
+
+The API uses the dataset specified by the `BOOKS_DATASET` environment variable. If not set, it defaults to `datasets/default`.
+
+```bash
+# Use default dataset
+python -m api.server
+
+# Use specific dataset
+BOOKS_DATASET=datasets/lindsay python -m api.server
+
+# Or with uvicorn
+BOOKS_DATASET=datasets/lindsay uvicorn api.server:app --reload
+```
 
 ## Notes
 
@@ -125,7 +138,6 @@ The API currently uses the default dataset (`datasets/default`). To change this,
 
 ## Future Enhancements
 
-- Configurable dataset via environment variable or config file
 - File watching for automatic cache refresh
 - CORS support for frontend
 - Authentication (if needed for multi-user)
