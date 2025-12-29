@@ -2,6 +2,13 @@
 
 A system for building and maintaining a canonical `books.csv` that represents your reading history and preferences, merging data from multiple sources (Goodreads, Kindle, physical shelves) while preserving your manual annotations.
 
+**Features:**
+- 📚 Merge and deduplicate books from multiple sources
+- 🔒 Protect manual annotations (ratings, notes, preferences)
+- 🎯 Generate personalized recommendations based on anchor books
+- 🌐 Optional read-only REST API for browsing and searching
+- ✅ Comprehensive test suite for data safety
+
 ## Dataset-Per-User Architecture
 
 This project supports multiple user datasets. Each dataset is self-contained in its own directory:
@@ -77,7 +84,7 @@ All scripts accept a `--dataset` argument (default: `datasets/default`). This al
 
 ## Schema
 
-See `DESIGN.md` for the complete schema and merge rules.
+See `docs/DESIGN.md` for the complete schema and merge rules.
 
 ## Directory Structure
 
@@ -88,9 +95,17 @@ books-project/
 │       ├── sources/      # Input data
 │       ├── books.csv     # Canonical output (edit this!)
 │       └── reports/      # Validation and duplicate reports
-├── scripts/              # Ingestion scripts
-├── utils/                # Utilities
-├── DESIGN.md             # Full design documentation
+├── api/                  # API layer (FastAPI server)
+│   ├── server.py         # Main API server
+│   ├── filters.py        # Filtering/search logic
+│   ├── recommendations.py # Recommendation API wrapper
+│   └── README.md         # API documentation
+├── scripts/              # Ingestion and pipeline scripts
+├── tests/                # Test suite
+│   ├── fixtures/         # Test data fixtures
+│   └── README.md         # Test documentation
+├── utils/                # Core utilities
+├── docs/                 # Documentation (see docs/README.md)
 └── README.md             # This file
 ```
 
@@ -135,6 +150,35 @@ All scripts support `--dataset` argument (default: `datasets/default`):
 
 - **`scripts/ingest_kindle.py`** - Converts Kindle library to canonical format
 
+## API (Optional)
+
+A read-only REST API is available for browsing, filtering, searching, and getting recommendations:
+
+```bash
+# Start the API server
+python -m api.server
+# or
+uvicorn api.server:app --reload
+```
+
+Then visit `http://localhost:8000/docs` for interactive API documentation.
+
+See `api/README.md` for full API documentation.
+
+## Testing
+
+The project includes a test suite focused on data safety and critical logic:
+
+```bash
+# Run all tests
+pytest tests/
+
+# Run with verbose output
+pytest tests/ -v
+```
+
+See `tests/README.md` for test documentation.
+
 ## Features
 
 ### Smart Deduplication
@@ -173,7 +217,7 @@ python scripts/recommend.py --dataset datasets/lindsay --query "mystery" --limit
 
 ## Next Steps
 
-1. Review `DESIGN.md` for the full specification
+1. Review `docs/DESIGN.md` for the full specification
 2. Create your dataset: `mkdir -p datasets/default/sources`
 3. Add your source data to `datasets/default/sources/`
 4. Ingest: `python scripts/ingest_goodreads.py --dataset datasets/default`

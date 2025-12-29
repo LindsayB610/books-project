@@ -14,17 +14,23 @@ This is a **books management system** that:
 
 **Prime Directive**: Never overwrite manual/protected fields.
 
-**For detailed project background, goals, and design rationale, see:** [`PROJECT_BACKGROUND.md`](PROJECT_BACKGROUND.md)
+**For detailed project background, goals, and design rationale, see:** [`PROJECT_BACKGROUND.md`](./PROJECT_BACKGROUND.md)
 
 ## Project Structure
 
 ```
 books-project/
-├── books.csv                    # Canonical output (human-editable, protected)
-├── sources/                     # Input data (gitignored)
-│   ├── goodreads_export.csv     # User's Goodreads export
-│   ├── kindle_library.csv       # Kindle library data
-│   └── README.md                # Instructions for user
+├── datasets/                    # User datasets (dataset-per-user)
+│   └── default/                # Default dataset
+│       ├── sources/            # Input data
+│       ├── books.csv          # Canonical output (edit this!)
+│       └── reports/           # Validation and duplicate reports
+├── api/                        # API layer (FastAPI server)
+│   ├── server.py              # Main API server
+│   ├── cache.py               # CSV caching
+│   ├── filters.py             # Filtering/search logic
+│   ├── recommendations.py    # Recommendation API wrapper
+│   └── README.md              # API documentation
 ├── scripts/
 │   ├── merge_and_dedupe.py      # Main pipeline (ingest → merge → dedupe)
 │   ├── validate_books_csv.py    # Data quality validation
@@ -33,12 +39,23 @@ books-project/
 │   ├── recommend.py             # Simple recommendation engine
 │   ├── ingest_goodreads.py      # Goodreads format converter
 │   └── ingest_kindle.py         # Kindle format converter
+├── tests/                       # Test suite
+│   ├── fixtures/                # Test data fixtures
+│   ├── test_csv_utils.py        # CSV utilities tests
+│   ├── test_normalization.py    # Normalization tests
+│   ├── test_deduplication.py    # Deduplication tests
+│   ├── test_work_id.py          # Work ID tests
+│   └── test_golden_file.py      # End-to-end tests
 ├── utils/
 │   ├── csv_utils.py             # Safe CSV I/O (preserves manual fields)
 │   ├── deduplication.py         # Matching logic (strict fuzzy matching)
 │   ├── normalization.py         # Title/author/identifier normalization
 │   └── work_id.py               # Stable ID generation
-└── DESIGN.md                    # Complete schema specification
+└── docs/                        # Documentation
+    ├── DESIGN.md                # Complete schema specification
+    ├── API_DESIGN.md            # API design proposal
+    ├── PROJECT_BACKGROUND.md    # Project background and rationale
+    └── agents.md                # This file
 ```
 
 ## Critical Rules
@@ -265,8 +282,8 @@ This project evolves via small, intentional commits. Because `books.csv` is user
 ### Schema Changes (High Friction, Intentional Only)
 
 Any change to the `books.csv` schema must include:
-- An update to `DESIGN.md`
-- A note in `CHANGES_SUMMARY.md` describing:
+- An update to `docs/DESIGN.md`
+- A note in `docs/CHANGES_SUMMARY.md` describing:
   - What changed
   - Why it changed
   - Whether it is backward compatible
@@ -311,8 +328,8 @@ Run validation scripts and verify:
 - No unexpected mass merges occurred
 
 **If behavior changed:**
-- Update `DESIGN.md`
-- Add a brief note to `CHANGES_SUMMARY.md`
+- Update `docs/DESIGN.md`
+- Add a brief note to `docs/CHANGES_SUMMARY.md`
 
 ### Version Control Expectations
 
@@ -439,7 +456,7 @@ When making changes:
    - `merge_books()` - Deduplicates and merges
    - `load_all_sources()` - Ingests from sources/
 
-4. **`DESIGN.md`** - Complete schema and rules documentation
+4. **`docs/DESIGN.md`** - Complete schema and rules documentation
 
 ## User Interaction Patterns
 
