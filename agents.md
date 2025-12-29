@@ -14,6 +14,8 @@ This is a **books management system** that:
 
 **Prime Directive**: Never overwrite manual/protected fields.
 
+**For detailed project background, goals, and design rationale, see:** [`PROJECT_BACKGROUND.md`](PROJECT_BACKGROUND.md)
+
 ## Project Structure
 
 ```
