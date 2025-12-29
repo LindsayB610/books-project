@@ -1,0 +1,13 @@
+# Render configuration file
+# This makes deployment even easier - just connect your repo and Render uses this config
+
+services:
+  - type: web
+    name: books-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: BOOKS_DATASET
+        value: datasets/lindsay
+

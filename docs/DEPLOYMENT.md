@@ -1,5 +1,7 @@
 # Deployment Guide: bookshelf.lindsaybrunner.com
 
+> **👋 Not a developer?** Check out **[SIMPLE_DEPLOYMENT.md](./SIMPLE_DEPLOYMENT.md)** instead! It's like using Netlify - super easy.
+
 This guide covers deploying the Books API to `bookshelf.lindsaybrunner.com`.
 
 ## Overview
